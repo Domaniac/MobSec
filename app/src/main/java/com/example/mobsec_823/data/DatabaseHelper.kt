@@ -1,42 +1,89 @@
 package com.example.mobsec_823.data
 
 import android.content.Context
-import com.example.mobsec_823.data.api.ApiClient
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.example.mobsec_823.data.api.ClassResponse
+import com.example.mobsec_823.data.api.SimpleApi
+import com.example.mobsec_823.data.api.SimpleResponse
+import com.example.mobsec_823.data.api.UserResponse
+import com.google.gson.Gson
 
+/**
+ * Simple database helper using bare-bones HTTP calls.
+ * No Retrofit, no OkHttp complexity.
+ */
 object DatabaseHelper {
+    private val gson = Gson()
+
     fun initialize(context: Context) {
-        try {
-            // Initialize API client instead of direct DB connection
-            ApiClient.initialize(context)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            throw IllegalStateException("Failed to initialize API client. Make sure app.properties exists and is configured.", e)
-        }
+        SimpleApi.initialize(context)
     }
 
-    suspend fun getUserById(userId: Int): User? = withContext(Dispatchers.IO) {
-        try {
-            val response = ApiClient.getService().getUserById(userId)
-            if (response.success && response.user != null) {
-                response.user
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
+    // ========== USER OPERATIONS ==========
+
+    suspend fun getUserById(userId: Int): User? {
+        val json = SimpleApi.get("/api/user/$userId") ?: return null
+        val response = gson.fromJson(json, UserResponse::class.java)
+        return if (response.success) response.user else null
     }
 
-    suspend fun testConnection(): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val response = ApiClient.getService().healthCheck()
-            response.success
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
+    suspend fun getAllUsers(): List<User> {
+        val json = SimpleApi.get("/api/users") ?: return emptyList()
+        val response = gson.fromJson(json, UserResponse::class.java)
+        return if (response.success) response.users ?: emptyList() else emptyList()
+    }
+
+    // ========== CLASS OPERATIONS ==========
+
+    suspend fun getAllClasses(): List<ClassEntity> {
+        val json = SimpleApi.get("/api/classes") ?: return emptyList()
+        val response = gson.fromJson(json, ClassResponse::class.java)
+        return if (response.success) response.classes ?: emptyList() else emptyList()
+    }
+
+    suspend fun createClass(className: String): ClassEntity? {
+        val body = gson.toJson(mapOf("class_name" to className))
+        val json = SimpleApi.post("/api/classes", body) ?: return null
+        val response = gson.fromJson(json, ClassResponse::class.java)
+        return if (response.success) response.`class` else null
+    }
+
+    suspend fun updateClass(classId: Int, className: String): Boolean {
+        val body = gson.toJson(mapOf("class_name" to className))
+        val json = SimpleApi.put("/api/classes/$classId", body) ?: return false
+        val response = gson.fromJson(json, SimpleResponse::class.java)
+        return response.success
+    }
+
+    suspend fun deleteClass(classId: Int): Boolean {
+        val json = SimpleApi.delete("/api/classes/$classId") ?: return false
+        val response = gson.fromJson(json, SimpleResponse::class.java)
+        return response.success
+    }
+
+    // ========== USER-CLASS OPERATIONS ==========
+
+    suspend fun getClassUsers(classId: Int): List<User> {
+        val json = SimpleApi.get("/api/classes/$classId/users") ?: return emptyList()
+        val response = gson.fromJson(json, UserResponse::class.java)
+        return if (response.success) response.users ?: emptyList() else emptyList()
+    }
+
+    suspend fun addUserToClass(classId: Int, userId: Int): Boolean {
+        val json = SimpleApi.post("/api/classes/$classId/users/$userId") ?: return false
+        val response = gson.fromJson(json, SimpleResponse::class.java)
+        return response.success
+    }
+
+    suspend fun removeUserFromClass(classId: Int, userId: Int): Boolean {
+        val json = SimpleApi.delete("/api/classes/$classId/users/$userId") ?: return false
+        val response = gson.fromJson(json, SimpleResponse::class.java)
+        return response.success
+    }
+
+    // ========== UTILITY ==========
+
+    suspend fun testConnection(): Boolean {
+        val json = SimpleApi.get("/api/health") ?: return false
+        return json.contains("healthy")
     }
 }
