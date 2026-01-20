@@ -4,44 +4,58 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.runtime.*
+import com.example.mobsec_823.data.DatabaseHelper
+import com.example.mobsec_823.data.User
+import com.example.mobsec_823.ui.screens.DiscussionForumScreen
+import com.example.mobsec_823.ui.screens.LoginTestScreen
 import com.example.mobsec_823.ui.theme.MobSecTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize database helper with application context
+        DatabaseHelper.initialize(applicationContext)
+
         enableEdgeToEdge()
         setContent {
             MobSecTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                MobSecApp()
             }
         }
     }
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
+fun MobSecApp() {
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.LoginTest) }
+    var currentUser by remember { mutableStateOf<User?>(null) }
+
+    when (currentScreen) {
+        Screen.LoginTest -> {
+            LoginTestScreen(
+                onUserSelected = { user ->
+                    currentUser = user
+                    currentScreen = Screen.DiscussionForum
+                }
+            )
+        }
+        Screen.DiscussionForum -> {
+            currentUser?.let { user ->
+                DiscussionForumScreen(
+                    user = user,
+                    onBackClick = {
+                        currentScreen = Screen.LoginTest
+                        currentUser = null
+                    }
+                )
+            }
+        }
+    }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    MobSecTheme {
-        Greeting("Android")
-    }
+sealed class Screen {
+    object LoginTest : Screen()
+    object DiscussionForum : Screen()
 }

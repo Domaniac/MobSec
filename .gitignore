@@ -14,3 +14,9 @@
 .cxx
 local.properties
 /.idea
+
+# Application credentials - DO NOT COMMIT
+**/app.properties
+**/database.properties
+**/api.properties
+*.py
