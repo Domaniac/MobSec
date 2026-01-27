@@ -96,12 +96,70 @@ object DatabaseHelper {
         return if (response.success) response.posts ?: emptyList() else emptyList()
     }
 
+    suspend fun createPost(classId: Int, userId: Int, title: String, content: String, imageUrl: String?): ForumPost? {
+        val body = gson.toJson(mapOf(
+            "user_id" to userId,
+            "title" to title,
+            "content" to content,
+            "image_url" to imageUrl
+        ))
+        val json = SimpleApi.post("/api/classes/$classId/posts", body) ?: return null
+        val response = gson.fromJson(json, ForumPostResponse::class.java)
+        return if (response.success) response.post else null
+    }
+
+    suspend fun updatePost(postId: Int, userId: Int, title: String, content: String, imageUrl: String?): Boolean {
+        val body = gson.toJson(mapOf(
+            "user_id" to userId,
+            "title" to title,
+            "content" to content,
+            "image_url" to imageUrl
+        ))
+        val json = SimpleApi.put("/api/posts/$postId", body) ?: return false
+        val response = gson.fromJson(json, SimpleResponse::class.java)
+        return response.success
+    }
+
+    suspend fun deletePost(postId: Int, userId: Int): Boolean {
+        val body = gson.toJson(mapOf("user_id" to userId))
+        val json = SimpleApi.deleteWithBody("/api/posts/$postId", body) ?: return false
+        val response = gson.fromJson(json, SimpleResponse::class.java)
+        return response.success
+    }
+
     // ========== COMMENT OPERATIONS ==========
 
     suspend fun getPostComments(postId: Int): List<Comment> {
         val json = SimpleApi.get("/api/posts/$postId/comments") ?: return emptyList()
         val response = gson.fromJson(json, CommentResponse::class.java)
         return if (response.success) response.comments ?: emptyList() else emptyList()
+    }
+
+    suspend fun createComment(postId: Int, userId: Int, content: String): Comment? {
+        val body = gson.toJson(mapOf(
+            "user_id" to userId,
+            "content" to content
+        ))
+        val json = SimpleApi.post("/api/posts/$postId/comments", body) ?: return null
+        val response = gson.fromJson(json, CommentResponse::class.java)
+        return if (response.success) response.comment else null
+    }
+
+    suspend fun updateComment(commentId: Int, userId: Int, content: String): Boolean {
+        val body = gson.toJson(mapOf(
+            "user_id" to userId,
+            "content" to content
+        ))
+        val json = SimpleApi.put("/api/comments/$commentId", body) ?: return false
+        val response = gson.fromJson(json, SimpleResponse::class.java)
+        return response.success
+    }
+
+    suspend fun deleteComment(commentId: Int, userId: Int): Boolean {
+        val body = gson.toJson(mapOf("user_id" to userId))
+        val json = SimpleApi.deleteWithBody("/api/comments/$commentId", body) ?: return false
+        val response = gson.fromJson(json, SimpleResponse::class.java)
+        return response.success
     }
 
     // ========== UTILITY ==========

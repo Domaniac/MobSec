@@ -96,6 +96,24 @@ object SimpleApi {
         null
     }
 
+    // Simple DELETE request with body (for endpoints that require user_id in body)
+    suspend fun deleteWithBody(endpoint: String, body: String): String? = withContext(Dispatchers.IO) {
+        repeat(MAX_RETRIES) { attempt ->
+            try {
+                println("SimpleApi DELETE (with body) $endpoint (attempt ${attempt + 1}/$MAX_RETRIES)")
+                val result = doDeleteWithBody(endpoint, body)
+                println("SimpleApi DELETE (with body) $endpoint SUCCESS: ${result?.take(200)}...")
+                return@withContext result
+            } catch (e: Exception) {
+                println("SimpleApi DELETE (with body) $endpoint FAILED (attempt ${attempt + 1}): ${e.message}")
+                if (attempt < MAX_RETRIES - 1) {
+                    delay(RETRY_DELAY_MS * (attempt + 1))
+                }
+            }
+        }
+        null
+    }
+
     // Simple PUT request with retry
     suspend fun put(endpoint: String, body: String = ""): String? = withContext(Dispatchers.IO) {
         repeat(MAX_RETRIES) { attempt ->
@@ -199,6 +217,42 @@ object SimpleApi {
                 // This makes the operation idempotent for the UI
                 println("SimpleApi DELETE $endpoint returned 404 (Not Found) - treating as success")
                 return "{\"success\": true, \"message\": \"Resource already deleted\"}"
+            } else {
+                val error = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText) ?: "Unknown error"
+                throw Exception("HTTP $responseCode: $error")
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun doDeleteWithBody(endpoint: String, body: String): String {
+        val url = URL("$baseUrl$endpoint")
+        val connection = url.openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "DELETE"
+            connection.setRequestProperty("X-App-Secret", apiKey)
+            connection.setRequestProperty("User-Agent", "MobSec-Android/1.0")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("Accept-Encoding", "identity")
+            connection.setRequestProperty("Connection", "close")
+            connection.connectTimeout = TIMEOUT_MS
+            connection.readTimeout = TIMEOUT_MS
+            connection.doOutput = true
+
+            // Write body
+            OutputStreamWriter(connection.outputStream).use { writer ->
+                writer.write(body)
+                writer.flush()
+            }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                return connection.inputStream.bufferedReader().use(BufferedReader::readText)
+            } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
+                println("SimpleApi DELETE (with body) $endpoint returned 404 (Not Found)")
+                return "{\"success\": false, \"message\": \"Resource not found\"}"
             } else {
                 val error = connection.errorStream?.bufferedReader()?.use(BufferedReader::readText) ?: "Unknown error"
                 throw Exception("HTTP $responseCode: $error")
