@@ -1,6 +1,8 @@
 package com.example.mobsec_823.data.api
 
 import com.example.mobsec_823.data.ClassEntity
+import com.example.mobsec_823.data.Comment
+import com.example.mobsec_823.data.ForumPost
 import com.example.mobsec_823.data.User
 
 /**
@@ -27,3 +29,20 @@ data class ClassResponse(
     val count: Int? = null,
     val error: String? = null
 )
+
+data class ForumPostResponse(
+    val success: Boolean = false,
+    val post: ForumPost? = null,
+    val posts: List<ForumPost>? = null,
+    val count: Int? = null,
+    val error: String? = null
+)
+
+data class CommentResponse(
+    val success: Boolean = false,
+    val comment: Comment? = null,
+    val comments: List<Comment>? = null,
+    val count: Int? = null,
+    val error: String? = null
+)
+

@@ -5,8 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
+import com.example.mobsec_823.data.ClassEntity
 import com.example.mobsec_823.data.DatabaseHelper
 import com.example.mobsec_823.data.User
+import com.example.mobsec_823.ui.screens.ClassListScreen
 import com.example.mobsec_823.ui.screens.ClassManagementScreen
 import com.example.mobsec_823.ui.screens.DiscussionForumScreen
 import com.example.mobsec_823.ui.screens.HomeMenuScreen
@@ -33,6 +35,7 @@ class MainActivity : ComponentActivity() {
 fun MobSecApp() {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.LoginTest) }
     var currentUser by remember { mutableStateOf<User?>(null) }
+    var selectedClass by remember { mutableStateOf<ClassEntity?>(null) }
 
     when (currentScreen) {
         Screen.LoginTest -> {
@@ -48,7 +51,7 @@ fun MobSecApp() {
                 HomeMenuScreen(
                     user = user,
                     onNavigateToForum = {
-                        currentScreen = Screen.DiscussionForum
+                        currentScreen = Screen.ClassList
                     },
                     onNavigateToClassManagement = {
                         currentScreen = Screen.ClassManagement
@@ -56,18 +59,37 @@ fun MobSecApp() {
                     onLogout = {
                         currentScreen = Screen.LoginTest
                         currentUser = null
+                        selectedClass = null
+                    }
+                )
+            }
+        }
+        Screen.ClassList -> {
+            currentUser?.let { user ->
+                ClassListScreen(
+                    user = user,
+                    onClassSelected = { classEntity ->
+                        selectedClass = classEntity
+                        currentScreen = Screen.DiscussionForum
+                    },
+                    onBackClick = {
+                        currentScreen = Screen.HomeMenu
                     }
                 )
             }
         }
         Screen.DiscussionForum -> {
             currentUser?.let { user ->
-                DiscussionForumScreen(
-                    user = user,
-                    onBackClick = {
-                        currentScreen = Screen.HomeMenu
-                    }
-                )
+                selectedClass?.let { classEntity ->
+                    DiscussionForumScreen(
+                        user = user,
+                        classId = classEntity.classId,
+                        className = classEntity.className,
+                        onBackClick = {
+                            currentScreen = Screen.ClassList
+                        }
+                    )
+                }
             }
         }
         Screen.ClassManagement -> {
@@ -86,6 +108,7 @@ fun MobSecApp() {
 sealed class Screen {
     object LoginTest : Screen()
     object HomeMenu : Screen()
+    object ClassList : Screen()
     object DiscussionForum : Screen()
     object ClassManagement : Screen()
 }

@@ -2,6 +2,8 @@ package com.example.mobsec_823.data
 
 import android.content.Context
 import com.example.mobsec_823.data.api.ClassResponse
+import com.example.mobsec_823.data.api.CommentResponse
+import com.example.mobsec_823.data.api.ForumPostResponse
 import com.example.mobsec_823.data.api.SimpleApi
 import com.example.mobsec_823.data.api.SimpleResponse
 import com.example.mobsec_823.data.api.UserResponse
@@ -78,6 +80,28 @@ object DatabaseHelper {
         val json = SimpleApi.delete("/api/classes/$classId/users/$userId") ?: return false
         val response = gson.fromJson(json, SimpleResponse::class.java)
         return response.success
+    }
+
+    suspend fun getUserClasses(userId: Int): List<ClassEntity> {
+        val json = SimpleApi.get("/api/users/$userId/classes") ?: return emptyList()
+        val response = gson.fromJson(json, ClassResponse::class.java)
+        return if (response.success) response.classes ?: emptyList() else emptyList()
+    }
+
+    // ========== FORUM POST OPERATIONS ==========
+
+    suspend fun getClassPosts(classId: Int): List<ForumPost> {
+        val json = SimpleApi.get("/api/classes/$classId/posts") ?: return emptyList()
+        val response = gson.fromJson(json, ForumPostResponse::class.java)
+        return if (response.success) response.posts ?: emptyList() else emptyList()
+    }
+
+    // ========== COMMENT OPERATIONS ==========
+
+    suspend fun getPostComments(postId: Int): List<Comment> {
+        val json = SimpleApi.get("/api/posts/$postId/comments") ?: return emptyList()
+        val response = gson.fromJson(json, CommentResponse::class.java)
+        return if (response.success) response.comments ?: emptyList() else emptyList()
     }
 
     // ========== UTILITY ==========
