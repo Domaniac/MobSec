@@ -153,23 +153,21 @@ fun DiscussionForumScreen(
 fun ForumPostCard(post: ForumPost) {
     var isExpanded by remember { mutableStateOf(false) }
     var comments by remember { mutableStateOf<List<Comment>>(emptyList()) }
-    var isLoadingComments by remember { mutableStateOf(false) }
+    var isLoadingComments by remember { mutableStateOf(true) }
     var commentsError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    // Load comments when expanded
-    LaunchedEffect(isExpanded) {
-        if (isExpanded && comments.isEmpty()) {
-            isLoadingComments = true
-            commentsError = null
-            try {
-                comments = DatabaseHelper.getPostComments(post.postId)
-            } catch (e: Exception) {
-                commentsError = "Failed to load comments"
-                e.printStackTrace()
-            } finally {
-                isLoadingComments = false
-            }
+    // Load comments on initial composition to get the count
+    LaunchedEffect(post.postId) {
+        isLoadingComments = true
+        commentsError = null
+        try {
+            comments = DatabaseHelper.getPostComments(post.postId)
+        } catch (e: Exception) {
+            commentsError = "Failed to load comments"
+            e.printStackTrace()
+        } finally {
+            isLoadingComments = false
         }
     }
 
@@ -216,13 +214,17 @@ fun ForumPostCard(post: ForumPost) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { isExpanded = !isExpanded }
+                    .clickable(enabled = !isLoadingComments) { isExpanded = !isExpanded }
                     .padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isExpanded) "Hide Comments" else "View Comments (${comments.size})",
+                    text = when {
+                        isLoadingComments && !isExpanded -> "View Comments (...)"
+                        isExpanded -> "Hide Comments"
+                        else -> "View Comments (${comments.size})"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
                 )

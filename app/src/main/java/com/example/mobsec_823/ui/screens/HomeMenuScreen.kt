@@ -59,7 +59,7 @@ fun HomeMenuScreen(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "User Information",
+                        text = "User Information (DEBUG, REMOVE LATER)",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
