@@ -19,7 +19,7 @@ object SimpleApi {
     private var apiKey: String = ""
 
     private const val TIMEOUT_MS = 15000 // Increased to 15 seconds
-    private const val MAX_RETRIES = 3
+    private const val MAX_RETRIES = 10
     private const val RETRY_DELAY_MS = 1000L // Increased to 1 second
 
     fun initialize(context: Context) {

@@ -13,6 +13,7 @@ import com.example.mobsec_823.ui.screens.ClassManagementScreen
 import com.example.mobsec_823.ui.screens.DiscussionForumScreen
 import com.example.mobsec_823.ui.screens.HomeMenuScreen
 import com.example.mobsec_823.ui.screens.LoginTestScreen
+import com.example.mobsec_823.ui.screens.StudentQueryScreen
 import com.example.mobsec_823.ui.theme.MobSecTheme
 
 class MainActivity : ComponentActivity() {
@@ -55,6 +56,9 @@ fun MobSecApp() {
                     },
                     onNavigateToClassManagement = {
                         currentScreen = Screen.ClassManagement
+                    },
+                    onNavigateToStudentQuery = {
+                        currentScreen = Screen.StudentQuery
                     },
                     onLogout = {
                         currentScreen = Screen.LoginTest
@@ -102,6 +106,26 @@ fun MobSecApp() {
                 )
             }
         }
+        Screen.StudentQuery -> {
+            currentUser?.let { user ->
+                StudentQueryScreen(
+                    user = user,
+                    onBackClick = {
+                        currentScreen = Screen.HomeMenu
+                    },
+                    onSubmitQuery = { questionText, priority ->
+                        DatabaseHelper.createQuestion(
+                            studentId = user.userId,
+                            classId = user.classId,
+                            teacherId = 1, // or from user if available
+                            questionText = questionText,
+                            priority = priority
+                        )
+                    }
+                )
+            }
+        }
+
     }
 }
 
@@ -111,4 +135,5 @@ sealed class Screen {
     object ClassList : Screen()
     object DiscussionForum : Screen()
     object ClassManagement : Screen()
+    object StudentQuery : Screen()
 }

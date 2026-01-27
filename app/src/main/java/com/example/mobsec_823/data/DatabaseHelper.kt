@@ -162,6 +162,29 @@ object DatabaseHelper {
         return response.success
     }
 
+    //=========== Question Stuff =======
+    suspend fun createQuestion(
+        studentId: Int,
+        classId: String,
+        teacherId: Int,
+        questionText: String,
+        priority: String
+    ): Boolean {
+        val body = gson.toJson(
+            mapOf(
+                "student_id" to studentId,
+                "class_id" to classId,
+                "teacher_id" to teacherId,
+                "question" to questionText,
+                "priority" to priority
+            )
+        )
+
+        val json = SimpleApi.post("/api/questions", body) ?: return false
+        val response = gson.fromJson(json, SimpleResponse::class.java)
+        return response.success
+    }
+
     // ========== UTILITY ==========
 
     suspend fun testConnection(): Boolean {

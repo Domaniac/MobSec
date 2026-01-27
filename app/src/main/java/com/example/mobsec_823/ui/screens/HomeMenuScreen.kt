@@ -14,6 +14,7 @@ fun HomeMenuScreen(
     user: User,
     onNavigateToForum: () -> Unit,
     onNavigateToClassManagement: () -> Unit,
+    onNavigateToStudentQuery: () -> Unit,
     onLogout: () -> Unit
 ) {
     Scaffold(
@@ -93,6 +94,12 @@ fun HomeMenuScreen(
                     text = "Discussion Forums",
                     style = MaterialTheme.typography.titleMedium
                 )
+            }
+            Button(
+                onClick = { onNavigateToStudentQuery() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Send Query to Teacher")
             }
 
             // Class Management button (only for Teachers and Admins)
