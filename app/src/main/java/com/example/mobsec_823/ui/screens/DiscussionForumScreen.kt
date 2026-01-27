@@ -140,7 +140,10 @@ fun DiscussionForumScreen(
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp) // Add padding for FAB
+                ) {
                     items(posts, key = { it.postId }) { post ->
                         ForumPostCard(
                             post = post,
@@ -235,7 +238,10 @@ fun ForumPostCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    val canModify = post.userId == currentUser.userId ||
+    // Only the post owner can edit
+    val canEdit = post.userId == currentUser.userId
+    // Owner, Admin, or Teacher can delete
+    val canDelete = post.userId == currentUser.userId ||
             currentUser.role.equals("Admin", ignoreCase = true) ||
             currentUser.role.equals("Teacher", ignoreCase = true)
 
@@ -263,13 +269,17 @@ fun ForumPostCard(
                     Text(text = post.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
                     Text(text = "by ${post.fullName ?: post.username} • ${post.createdAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (canModify) {
+                if (canEdit || canDelete) {
                     Row {
-                        IconButton(onClick = { showEditDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        if (canEdit) {
+                            IconButton(onClick = { showEditDialog = true }, modifier = Modifier.size(32.dp)) {
+                                Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            }
                         }
-                        IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                        if (canDelete) {
+                            IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.size(32.dp)) {
+                                Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                            }
                         }
                     }
                 }
@@ -345,8 +355,10 @@ fun ForumPostCard(
             onConfirm = {
                 scope.launch {
                     val success = DatabaseHelper.deletePost(post.postId, currentUser.userId)
-                    if (success) onPostDeleted()
                     showDeleteDialog = false
+                    if (success) {
+                        onPostDeleted()
+                    }
                 }
             }
         )
@@ -441,7 +453,10 @@ fun CommentItem(comment: Comment, currentUser: User, onCommentUpdated: () -> Uni
     var showDeleteDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    val canModify = comment.userId == currentUser.userId ||
+    // Only the comment owner can edit
+    val canEdit = comment.userId == currentUser.userId
+    // Owner, Admin, or Teacher can delete
+    val canDelete = comment.userId == currentUser.userId ||
             currentUser.role.equals("Admin", ignoreCase = true) ||
             currentUser.role.equals("Teacher", ignoreCase = true)
 
@@ -453,13 +468,17 @@ fun CommentItem(comment: Comment, currentUser: User, onCommentUpdated: () -> Uni
                     style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f)
                 )
-                if (canModify) {
+                if (canEdit || canDelete) {
                     Row {
-                        IconButton(onClick = { showEditDialog = true }, modifier = Modifier.size(28.dp)) {
-                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        if (canEdit) {
+                            IconButton(onClick = { showEditDialog = true }, modifier = Modifier.size(28.dp)) {
+                                Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                            }
                         }
-                        IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.size(28.dp)) {
-                            Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                        if (canDelete) {
+                            IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.size(28.dp)) {
+                                Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }
