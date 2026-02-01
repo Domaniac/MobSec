@@ -11,7 +11,7 @@ data class Question(
     val studentId: Int,
 
     @SerializedName("class_id")
-    val classId: String,
+    val classId: Int,
 
     @SerializedName("teacher_id")
     val teacherId: Int,
@@ -26,5 +26,11 @@ data class Question(
     val status: String,
 
     @SerializedName("priority")
-    val priority: String
+    val priority: String,
+
+    @SerializedName("answer")
+    val answer: String? = null,
+
+    @SerializedName("student_full_name")
+    val studentName: String?
 )

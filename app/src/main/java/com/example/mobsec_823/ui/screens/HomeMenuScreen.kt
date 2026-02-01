@@ -15,6 +15,8 @@ fun HomeMenuScreen(
     onNavigateToForum: () -> Unit,
     onNavigateToClassManagement: () -> Unit,
     onNavigateToStudentQuery: () -> Unit,
+    onNavigateToStudentDashboard: () -> Unit,
+    onNavigateToTeacherDashboard: () -> Unit,
     onLogout: () -> Unit
 ) {
     Scaffold(
@@ -95,11 +97,31 @@ fun HomeMenuScreen(
                     style = MaterialTheme.typography.titleMedium
                 )
             }
-            Button(
-                onClick = { onNavigateToStudentQuery() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Send Query to Teacher")
+            if (user.role.equals("Student", ignoreCase = true)) {
+                Button(
+                    onClick = onNavigateToStudentDashboard,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                ) {
+                    Text("My Question History")
+                }
+            }
+            if (user.role == "Teacher") {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onNavigateToTeacherDashboard,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) {
+                    Text("Teacher Dashboard (Questions)")
+                }
+            }
+
+            // Show Student Query button ONLY if user is a student
+            if (user.role == "Student") {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(onClick = onNavigateToStudentQuery, modifier = Modifier.fillMaxWidth()) {
+                    Text("Ask a Question")
+                }
             }
 
             // Class Management button (only for Teachers and Admins)

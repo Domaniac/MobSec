@@ -13,7 +13,9 @@ import com.example.mobsec_823.ui.screens.ClassManagementScreen
 import com.example.mobsec_823.ui.screens.DiscussionForumScreen
 import com.example.mobsec_823.ui.screens.HomeMenuScreen
 import com.example.mobsec_823.ui.screens.LoginTestScreen
+import com.example.mobsec_823.ui.screens.StudentDashboardScreen
 import com.example.mobsec_823.ui.screens.StudentQueryScreen
+import com.example.mobsec_823.ui.screens.TeacherDashboardScreen
 import com.example.mobsec_823.ui.theme.MobSecTheme
 
 class MainActivity : ComponentActivity() {
@@ -43,7 +45,12 @@ fun MobSecApp() {
             LoginTestScreen(
                 onUserSelected = { user ->
                     currentUser = user
-                    currentScreen = Screen.HomeMenu
+                    // FIX: Redirect based on role
+                    currentScreen = if (user.role == "teacher") {
+                        Screen.TeacherDashboard
+                    } else {
+                        Screen.HomeMenu
+                    }
                 }
             )
         }
@@ -54,11 +61,18 @@ fun MobSecApp() {
                     onNavigateToForum = {
                         currentScreen = Screen.ClassList
                     },
+                    onNavigateToStudentDashboard = {
+                        currentScreen = Screen.StudentDashboard
+                    },
                     onNavigateToClassManagement = {
                         currentScreen = Screen.ClassManagement
                     },
+
                     onNavigateToStudentQuery = {
                         currentScreen = Screen.StudentQuery
+                    },
+                    onNavigateToTeacherDashboard = {
+                        currentScreen = Screen.TeacherDashboard
                     },
                     onLogout = {
                         currentScreen = Screen.LoginTest
@@ -106,6 +120,14 @@ fun MobSecApp() {
                 )
             }
         }
+        Screen.StudentDashboard -> {
+            currentUser?.let { user ->
+                StudentDashboardScreen(
+                    user = user,
+                    onBackClick = { currentScreen = Screen.HomeMenu }
+                )
+            }
+        }
         Screen.StudentQuery -> {
             currentUser?.let { user ->
                 StudentQueryScreen(
@@ -113,19 +135,33 @@ fun MobSecApp() {
                     onBackClick = {
                         currentScreen = Screen.HomeMenu
                     },
-                    onSubmitQuery = { questionText, priority ->
+                    onSubmitQuery = { teacherId, questionText, priority ->
+                        // FIX: Use toIntOrNull() and provide a default value (0)
+                        // to prevent NumberFormatException if classId is null or empty
+                        val safeClassId = user.classId?.toIntOrNull() ?: 0
+
                         DatabaseHelper.createQuestion(
                             studentId = user.userId,
-                            classId = user.classId,
-                            teacherId = 1, // or from user if available
-                            questionText = questionText,
+                            classId = safeClassId,
+                            teacherId = teacherId,
+                            question = questionText,
                             priority = priority
                         )
                     }
                 )
             }
         }
-
+        Screen.TeacherDashboard -> {
+            currentUser?.let { user ->
+                TeacherDashboardScreen(
+                    teacher = user,
+                    onLogout = {
+                        currentScreen = Screen.LoginTest
+                        currentUser = null
+                    }
+                )
+            }
+        }
     }
 }
 
@@ -135,5 +171,7 @@ sealed class Screen {
     object ClassList : Screen()
     object DiscussionForum : Screen()
     object ClassManagement : Screen()
+    object StudentDashboard : Screen()
     object StudentQuery : Screen()
+    object TeacherDashboard : Screen()
 }

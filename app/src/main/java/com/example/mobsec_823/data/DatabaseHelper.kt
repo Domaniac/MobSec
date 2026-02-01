@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.mobsec_823.data.api.ClassResponse
 import com.example.mobsec_823.data.api.CommentResponse
 import com.example.mobsec_823.data.api.ForumPostResponse
+import com.example.mobsec_823.data.api.QuestionResponse
 import com.example.mobsec_823.data.api.SimpleApi
 import com.example.mobsec_823.data.api.SimpleResponse
 import com.example.mobsec_823.data.api.UserResponse
@@ -68,6 +69,13 @@ object DatabaseHelper {
         val json = SimpleApi.get("/api/classes/$classId/users") ?: return emptyList()
         val response = gson.fromJson(json, UserResponse::class.java)
         return if (response.success) response.users ?: emptyList() else emptyList()
+    }
+
+    suspend fun getTeachers(): List<User> {
+        val json = SimpleApi.get("/api/users?role=teacher") ?: return emptyList()
+        // Assuming your API returns a list of users
+        val type = object : com.google.gson.reflect.TypeToken<List<User>>() {}.type
+        return gson.fromJson(json, type) ?: emptyList()
     }
 
     suspend fun addUserToClass(classId: Int, userId: Int): Boolean {
@@ -165,17 +173,19 @@ object DatabaseHelper {
     //=========== Question Stuff =======
     suspend fun createQuestion(
         studentId: Int,
-        classId: String,
+        classId: Int, // Changed from String to Int to match backend expectation
         teacherId: Int,
-        questionText: String,
+        question: String,
         priority: String
     ): Boolean {
+        // The keys MUST match the backend's expected fields exactly:
+        // student_id, class_id, teacher_id, question, priority
         val body = gson.toJson(
             mapOf(
                 "student_id" to studentId,
                 "class_id" to classId,
                 "teacher_id" to teacherId,
-                "question" to questionText,
+                "question" to question, // Changed from "questionText" to "question"
                 "priority" to priority
             )
         )
@@ -184,6 +194,26 @@ object DatabaseHelper {
         val response = gson.fromJson(json, SimpleResponse::class.java)
         return response.success
     }
+    // Fetch questions sent TO a specific teacher
+    suspend fun getQuestionsForTeacher(teacherId: Int): List<Question> {
+        val json = SimpleApi.get("/api/teacher/$teacherId/questions") ?: return emptyList()
+        val response = gson.fromJson(json, QuestionResponse::class.java)
+        return if (response.success) response.questions ?: emptyList() else emptyList()
+    }
+
+    suspend fun answerQuestion(questionId: Int, answer: String): Boolean {
+        val body = gson.toJson(mapOf("answer" to answer))
+        val json = SimpleApi.put("/api/questions/$questionId/answer", body) ?: return false
+        val response = gson.fromJson(json, SimpleResponse::class.java)
+        return response.success
+    }
+
+    suspend fun getQuestionsByStudent(studentId: Int): List<Question> {
+        val json = SimpleApi.get("/api/student/$studentId/questions") ?: return emptyList()
+        val response = gson.fromJson(json, QuestionResponse::class.java)
+        return if (response.success) response.questions ?: emptyList() else emptyList()
+    }
+
 
     // ========== UTILITY ==========
 
