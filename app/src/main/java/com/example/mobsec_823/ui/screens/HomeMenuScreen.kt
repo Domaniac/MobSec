@@ -17,6 +17,7 @@ fun HomeMenuScreen(
     onNavigateToStudentQuery: () -> Unit,
     onNavigateToStudentDashboard: () -> Unit,
     onNavigateToTeacherDashboard: () -> Unit,
+    onNavigateToGroupManagement: () -> Unit,
     onLogout: () -> Unit
 ) {
     Scaffold(
@@ -121,6 +122,13 @@ fun HomeMenuScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(onClick = onNavigateToStudentQuery, modifier = Modifier.fillMaxWidth()) {
                     Text("Ask a Question")
+                }
+            }
+
+            if (user.role == "Student") {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(onClick = onNavigateToGroupManagement, modifier = Modifier.fillMaxWidth()) {
+                    Text("My Group & Members")
                 }
             }
 

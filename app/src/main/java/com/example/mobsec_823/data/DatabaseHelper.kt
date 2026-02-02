@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.mobsec_823.data.api.ClassResponse
 import com.example.mobsec_823.data.api.CommentResponse
 import com.example.mobsec_823.data.api.ForumPostResponse
+import com.example.mobsec_823.data.api.GroupResponse
 import com.example.mobsec_823.data.api.QuestionResponse
 import com.example.mobsec_823.data.api.SimpleApi
 import com.example.mobsec_823.data.api.SimpleResponse
@@ -213,6 +214,28 @@ object DatabaseHelper {
         val response = gson.fromJson(json, QuestionResponse::class.java)
         return if (response.success) response.questions ?: emptyList() else emptyList()
     }
+
+    // ========== Group Stuff ========
+    /**
+     * Fetches the group details for a specific user within a class.
+     */
+    suspend fun getUserGroup(classId: Int, userId: Int): GroupEntity? {
+        // This ensures the URL becomes /api/classes/1/users/1/group
+        val json = SimpleApi.get("/api/classes/$classId/users/$userId/group") ?: return null
+        val response = gson.fromJson(json, GroupResponse::class.java)
+        return if (response.success) response.group else null
+    }
+
+    /**
+     * Fetches students in a class who are not currently assigned to any group.
+     */
+    suspend fun getUnassignedStudents(classId: Int): List<User> {
+        val json = SimpleApi.get("/api/classes/$classId/unassigned") ?: return emptyList()
+        val response = gson.fromJson(json, UserResponse::class.java)
+        return if (response.success) response.users ?: emptyList() else emptyList()
+    }
+
+
 
 
     // ========== UTILITY ==========

@@ -1,5 +1,6 @@
 package com.example.mobsec_823
 
+import com.example.mobsec_823.ui.screens.GroupManagementScreen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -73,6 +74,9 @@ fun MobSecApp() {
                     },
                     onNavigateToTeacherDashboard = {
                         currentScreen = Screen.TeacherDashboard
+                    },
+                    onNavigateToGroupManagement = {
+                        currentScreen = Screen.GroupManagement
                     },
                     onLogout = {
                         currentScreen = Screen.LoginTest
@@ -162,6 +166,20 @@ fun MobSecApp() {
                 )
             }
         }
+
+        Screen.GroupManagement -> {
+            currentUser?.let { user ->
+                val safeClassId = user.classId?.toIntOrNull() ?: 1
+
+                GroupManagementScreen(
+                    classId = safeClassId,
+                    user = user, // Changed parameter name to match the User class requirement
+                    onBackClick = {
+                        currentScreen = Screen.HomeMenu
+                    }
+                )
+            }
+        }
     }
 }
 
@@ -174,4 +192,5 @@ sealed class Screen {
     object StudentDashboard : Screen()
     object StudentQuery : Screen()
     object TeacherDashboard : Screen()
+    object GroupManagement : Screen()
 }

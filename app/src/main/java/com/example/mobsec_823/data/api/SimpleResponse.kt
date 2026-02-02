@@ -5,6 +5,7 @@ import com.example.mobsec_823.data.Question
 import com.example.mobsec_823.data.Comment
 import com.example.mobsec_823.data.ForumPost
 import com.example.mobsec_823.data.User
+import com.example.mobsec_823.data.GroupEntity
 
 /**
  * Simple response classes for JSON parsing
@@ -22,6 +23,11 @@ data class UserResponse(
     val count: Int? = null,
     val error: String? = null
 )
+data class GroupResponse(
+    val success: Boolean,
+    val group: GroupEntity? = null,
+    val message: String? = null
+)
 
 data class ClassResponse(
     val success: Boolean = false,
@@ -37,6 +43,8 @@ data class QuestionResponse(
     val count: Int? = null,
     val error: String? = null
 )
+
+
 data class ForumPostResponse(
     val success: Boolean = false,
     val post: ForumPost? = null,

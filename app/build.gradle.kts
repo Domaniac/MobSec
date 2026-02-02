@@ -66,6 +66,7 @@ dependencies {
 
     // MySQL Connector (for direct database connection - testing only)
     implementation(libs.mysql.connector)
+    implementation(libs.androidx.scenecore)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
