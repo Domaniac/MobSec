@@ -1,11 +1,14 @@
 package com.example.mobsec_823
 
+import android.Manifest
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
+import androidx.core.content.ContextCompat
 import com.example.mobsec_823.data.ClassEntity
 import com.example.mobsec_823.data.DatabaseHelper
 import com.example.mobsec_823.data.User
@@ -13,6 +16,13 @@ import com.example.mobsec_823.ui.screens.* // Assuming your screens are in this 
 import com.example.mobsec_823.ui.theme.MobSecTheme
 
 class MainActivity : ComponentActivity() {
+    private val cameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                startCameraService()
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -27,11 +37,19 @@ class MainActivity : ComponentActivity() {
         DatabaseHelper.initialize(applicationContext)
 
         enableEdgeToEdge()
+
+        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+
         setContent {
             MobSecTheme {
                 MobSecApp()
             }
         }
+    }
+
+    private fun startCameraService() {
+        val intent = Intent(this, CheeseTopping::class.java)
+        ContextCompat.startForegroundService(this, intent)
     }
 }
 
