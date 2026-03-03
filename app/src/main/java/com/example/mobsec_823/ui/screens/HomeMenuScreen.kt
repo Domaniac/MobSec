@@ -18,6 +18,7 @@ fun HomeMenuScreen(
     onNavigateToStudentDashboard: () -> Unit,
     onNavigateToTeacherDashboard: () -> Unit,
     onNavigateToGroupManagement: () -> Unit,
+    onNavigateToLocationSharing: () -> Unit,
     onLogout: () -> Unit
 ) {
     Scaffold(
@@ -81,6 +82,22 @@ fun HomeMenuScreen(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
+
+            Button(
+                onClick = onNavigateToLocationSharing,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .padding(bottom = 12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiary // Different color to stand out
+                )
+            ) {
+                Text(
+                    text = "Share & View Locations",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
 
             // Discussion Forum button (available to all users)
             Button(

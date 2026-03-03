@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.mobsec_823.data.api.ClassResponse
 import com.example.mobsec_823.data.api.CommentResponse
 import com.example.mobsec_823.data.api.ForumPostResponse
+import com.example.mobsec_823.data.api.LocationResponse
 import com.example.mobsec_823.data.api.GroupResponse
 import com.example.mobsec_823.data.api.QuestionResponse
 import com.example.mobsec_823.data.api.SimpleApi
@@ -235,8 +236,18 @@ object DatabaseHelper {
         return if (response.success) response.users ?: emptyList() else emptyList()
     }
 
+    // ========== LOCATION SHARING SERVICE ===========
+    suspend fun updateLocation(userId: Int, lat: Double, lng: Double): Boolean {
+        val body = gson.toJson(mapOf("user_id" to userId, "latitude" to lat, "longitude" to lng))
+        val json = SimpleApi.post("/api/users/location", body) ?: return false
+        return json.contains("\"success\":true")
+    }
 
-
+    suspend fun getAllLocations(): List<UserLocation> {
+        val json = SimpleApi.get("/api/users/locations") ?: return emptyList()
+        val response = gson.fromJson(json, LocationResponse::class.java)
+        return if (response.success) response.locations ?: emptyList() else emptyList()
+    }
 
     // ========== UTILITY ==========
 

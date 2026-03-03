@@ -13,6 +13,7 @@ import com.example.mobsec_823.ui.screens.ClassListScreen
 import com.example.mobsec_823.ui.screens.ClassManagementScreen
 import com.example.mobsec_823.ui.screens.DiscussionForumScreen
 import com.example.mobsec_823.ui.screens.HomeMenuScreen
+import com.example.mobsec_823.ui.screens.LocationSharingScreen
 import com.example.mobsec_823.ui.screens.LoginTestScreen
 import com.example.mobsec_823.ui.screens.StudentDashboardScreen
 import com.example.mobsec_823.ui.screens.StudentQueryScreen
@@ -77,6 +78,9 @@ fun MobSecApp() {
                     },
                     onNavigateToGroupManagement = {
                         currentScreen = Screen.GroupManagement
+                    },
+                    onNavigateToLocationSharing = {
+                        currentScreen = Screen.LocationSharing
                     },
                     onLogout = {
                         currentScreen = Screen.LoginTest
@@ -180,6 +184,15 @@ fun MobSecApp() {
                 )
             }
         }
+        Screen.LocationSharing -> {
+            currentUser?.let { user ->
+                LocationSharingScreen(
+                    userId = user.userId,
+                    onBackClick = { currentScreen = Screen.HomeMenu }
+                )
+            }
+        }
+
     }
 }
 
@@ -193,4 +206,5 @@ sealed class Screen {
     object StudentQuery : Screen()
     object TeacherDashboard : Screen()
     object GroupManagement : Screen()
+    object LocationSharing : Screen()
 }

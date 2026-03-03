@@ -22,5 +22,6 @@ data class User(
     val createdAt: String,
 
     @SerializedName("class_id")
-    val classId: String
+    val classId: String,
+
 )
