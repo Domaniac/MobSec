@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,20 +20,25 @@ import kotlinx.coroutines.launch
 @Composable
 fun ClassListScreen(
     user: User,
+    title: String = "Select Class",
     onClassSelected: (ClassEntity) -> Unit,
-    onBackClick: () -> Unit
+    onMenuClick: () -> Unit
 ) {
     var classes by remember { mutableStateOf<List<ClassEntity>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
 
-    // Load user's classes on first composition
+    // Load classes
     LaunchedEffect(user.userId) {
         isLoading = true
         errorMessage = null
         try {
-            classes = DatabaseHelper.getUserClasses(user.userId)
+            // For Teacher/Admin, show all classes
+            if (user.role.equals("Teacher", ignoreCase = true) || user.role.equals("Admin", ignoreCase = true)) {
+                classes = DatabaseHelper.getAllClasses()
+            } else {
+                classes = DatabaseHelper.getUserClasses(user.userId)
+            }
         } catch (e: Exception) {
             errorMessage = "Failed to load classes: ${e.message}"
             e.printStackTrace()
@@ -43,10 +50,10 @@ fun ClassListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Classes") },
+                title = { Text(title) },
                 navigationIcon = {
-                    TextButton(onClick = onBackClick) {
-                        Text("← Back")
+                    IconButton(onClick = onMenuClick) {
+                        Icon(Icons.Default.Menu, contentDescription = "Menu")
                     }
                 }
             )
@@ -59,7 +66,7 @@ fun ClassListScreen(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Select a class to view discussions:",
+                text = "Select a class to proceed:",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -74,7 +81,7 @@ fun ClassListScreen(
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Loading your classes...",
+                            text = "Loading classes...",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -114,15 +121,10 @@ fun ClassListScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "You're not enrolled in any classes yet.",
+                            text = "No classes found.",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = "Contact your teacher or admin to get enrolled.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
                 }
@@ -130,18 +132,11 @@ fun ClassListScreen(
 
             // Class list
             if (!isLoading && classes.isNotEmpty()) {
-                Text(
-                    text = "You're enrolled in ${classes.size} ${if (classes.size == 1) "class" else "classes"}:",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(classes) { classEntity ->
-                        ClassCard(
+                        ClassItemCard(
                             classEntity = classEntity,
                             onClick = { onClassSelected(classEntity) }
                         )
@@ -153,7 +148,7 @@ fun ClassListScreen(
 }
 
 @Composable
-fun ClassCard(
+fun ClassItemCard(
     classEntity: ClassEntity,
     onClick: () -> Unit
 ) {

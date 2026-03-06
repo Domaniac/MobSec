@@ -6,6 +6,9 @@ data class User(
     @SerializedName("user_id")
     val userId: Int,
 
+    @SerializedName("student_employee_number")
+    val studentEmployeeNumber: String,
+
     @SerializedName("username")
     val username: String,
 
@@ -13,15 +16,14 @@ data class User(
     val role: String,
 
     @SerializedName("full_name")
-    val fullName: String?,
+    val fullName: String? = null,
 
     @SerializedName("profile_image_url")
-    val profileImageUrl: String?,
+    val profileImageUrl: String? = null,
 
     @SerializedName("created_at")
     val createdAt: String,
 
     @SerializedName("class_id")
-    val classId: String,
-
+    val classId: String
 )

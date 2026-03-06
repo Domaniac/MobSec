@@ -25,6 +25,24 @@ data class UserResponse(
     val error: String? = null
 )
 
+sealed class LoginResult {
+    data class Success(val user: User) : LoginResult()
+    data class Failure(val errorMessage: String) : LoginResult()
+}
+
+sealed class RegisterResult {
+    object Success : RegisterResult()
+    data class Failure(val message: String) : RegisterResult()
+}
+
+data class LoginResponse(
+    val success: Boolean = false,
+    val token: String? = null,
+    val user: User? = null,
+    val error: String? = null
+)
+
+
 data class GroupResponse(
     val success: Boolean,
     val group: GroupEntity? = null,
@@ -68,4 +86,3 @@ data class LocationResponse(
     val locations: List<UserLocation>? = null,
     val message: String? = null
 )
-

@@ -1,21 +1,28 @@
 package com.example.mobsec_823.ui.screens
 
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.mobsec_823.data.ClassEntity
 import com.example.mobsec_823.data.DatabaseHelper
 import com.example.mobsec_823.data.User
@@ -25,29 +32,40 @@ import kotlinx.coroutines.launch
 @Composable
 fun ClassManagementScreen(
     user: User,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onManageGroups: (ClassEntity) -> Unit = {}
 ) {
     var classes by remember { mutableStateOf<List<ClassEntity>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(if (user.role.equals("Admin", ignoreCase = true)) 0 else 1) }
 
+    val isAdmin = user.role.equals("Admin", ignoreCase = true)
     val scope = rememberCoroutineScope()
 
-    // Load classes on start
+    // Load classes based on role
+    val refreshClasses = {
+        scope.launch {
+            isLoading = true
+            classes = if (isAdmin) {
+                DatabaseHelper.getAllClasses()
+            } else {
+                DatabaseHelper.getUserClasses(user.userId)
+            }
+            isLoading = false
+        }
+    }
+
     LaunchedEffect(Unit) {
-        isLoading = true
-        classes = DatabaseHelper.getAllClasses()
-        isLoading = false
+        refreshClasses()
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Class Management") },
+                title = { Text(if (isAdmin) "Class Management" else "My Classes") },
                 navigationIcon = {
-                    TextButton(onClick = onBackClick) {
-                        Text("← Back")
+                    IconButton(onClick = onBackClick) {
+                        Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu")
                     }
                 }
             )
@@ -58,39 +76,31 @@ fun ClassManagementScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            TabRow(selectedTabIndex = selectedTab) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Create Class") }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Manage Classes") }
-                )
+            if (isAdmin) {
+                TabRow(selectedTabIndex = selectedTab) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("Create Class") }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("Manage Classes") }
+                    )
+                }
             }
 
             when (selectedTab) {
-                0 -> CreateClassTab(
-                    onClassCreated = {
-                        scope.launch {
-                            isLoading = true
-                            classes = DatabaseHelper.getAllClasses()
-                            isLoading = false
-                        }
-                    }
-                )
+                0 -> if (isAdmin) {
+                    CreateClassTab(onClassCreated = { refreshClasses() })
+                }
                 1 -> ManageClassesTab(
+                    user = user,
                     classes = classes,
                     isLoading = isLoading,
-                    onRefresh = {
-                        scope.launch {
-                            isLoading = true
-                            classes = DatabaseHelper.getAllClasses()
-                            isLoading = false
-                        }
-                    }
+                    onRefresh = { refreshClasses() },
+                    onManageGroups = onManageGroups
                 )
             }
         }
@@ -103,292 +113,115 @@ fun CreateClassTab(onClassCreated: () -> Unit) {
     var isCreating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
-
     val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "Create New Class",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Create New Class", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
         OutlinedTextField(
             value = className,
-            onValueChange = {
-                className = it
-                errorMessage = null
-                successMessage = null
-            },
+            onValueChange = { className = it; errorMessage = null; successMessage = null },
             label = { Text("Class Name") },
             modifier = Modifier.fillMaxWidth(),
             enabled = !isCreating,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             singleLine = true
         )
-
         Spacer(modifier = Modifier.height(16.dp))
-
         Button(
             onClick = {
-                if (className.isBlank()) {
-                    errorMessage = "Class name cannot be empty"
-                    return@Button
-                }
-
+                if (className.isBlank()) { errorMessage = "Class name cannot be empty"; return@Button }
                 scope.launch {
                     isCreating = true
-                    errorMessage = null
-                    successMessage = null
-
                     val createdClass = DatabaseHelper.createClass(className)
                     if (createdClass != null) {
-                        successMessage = "Class '${createdClass.className}' created successfully!"
-                        className = ""
-                        onClassCreated()
-                    } else {
-                        errorMessage = "Failed to create class. Please try again."
-                    }
-
+                        successMessage = "Class '${createdClass.className}' created!"; className = ""; onClassCreated()
+                    } else { errorMessage = "Failed to create class" }
                     isCreating = false
                 }
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = !isCreating
         ) {
-            if (isCreating) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            Text("Create Class")
+            if (isCreating) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+            else Text("Create Class")
         }
-
-        errorMessage?.let { error ->
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
-            ) {
-                Text(
-                    text = error,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
-        }
-
-        successMessage?.let { message ->
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
-        }
+        errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 16.dp)) }
+        successMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 16.dp)) }
     }
 }
 
 @Composable
 fun ManageClassesTab(
+    user: User,
     classes: List<ClassEntity>,
     isLoading: Boolean,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onManageGroups: (ClassEntity) -> Unit
 ) {
     var selectedClass by remember { mutableStateOf<ClassEntity?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showManageUsersDialog by remember { mutableStateOf(false) }
+    val isAdmin = user.role.equals("Admin", ignoreCase = true)
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "All Classes (${classes.size})",
-                style = MaterialTheme.typography.headlineSmall
-            )
-
-            IconButton(onClick = onRefresh) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Refresh"
-                )
-            }
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(text = if (isAdmin) "All Classes" else "Assigned Classes", style = MaterialTheme.typography.headlineSmall)
+            IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, "Refresh") }
         }
-
         Spacer(modifier = Modifier.height(16.dp))
-
         if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         } else if (classes.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No classes found. Create one in the 'Create Class' tab!",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(if (isAdmin) "No classes found." else "No classes assigned yet.", textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(classes) { classEntity ->
                     ClassCard(
+                        user = user,
                         classEntity = classEntity,
-                        onEdit = {
-                            selectedClass = classEntity
-                            showEditDialog = true
-                        },
-                        onDelete = {
-                            selectedClass = classEntity
-                            showDeleteDialog = true
-                        },
-                        onManageUsers = {
-                            selectedClass = classEntity
-                            showManageUsersDialog = true
-                        }
+                        onEdit = { selectedClass = classEntity; showEditDialog = true },
+                        onDelete = { selectedClass = classEntity; showDeleteDialog = true },
+                        onManageUsers = { selectedClass = classEntity; showManageUsersDialog = true },
+                        onManageGroups = { onManageGroups(classEntity) }
                     )
                 }
             }
         }
     }
 
-    // Edit Dialog
-    if (showEditDialog && selectedClass != null) {
-        EditClassDialog(
-            classEntity = selectedClass!!,
-            onDismiss = { showEditDialog = false },
-            onConfirm = { newName ->
-                onRefresh()
-                showEditDialog = false
-            }
-        )
-    }
-
-    // Delete Dialog
-    if (showDeleteDialog && selectedClass != null) {
-        DeleteClassDialog(
-            classEntity = selectedClass!!,
-            onDismiss = { showDeleteDialog = false },
-            onConfirm = {
-                onRefresh()
-                showDeleteDialog = false
-            }
-        )
-    }
-
-    // Manage Users Dialog
-    if (showManageUsersDialog && selectedClass != null) {
-        ManageClassUsersDialog(
-            classEntity = selectedClass!!,
-            onDismiss = { showManageUsersDialog = false }
-        )
-    }
+    if (showEditDialog && selectedClass != null) EditClassDialog(selectedClass!!, onDismiss = { showEditDialog = false }, onConfirm = { onRefresh(); showEditDialog = false })
+    if (showDeleteDialog && selectedClass != null) DeleteClassDialog(selectedClass!!, onDismiss = { showDeleteDialog = false }, onConfirm = { onRefresh(); showDeleteDialog = false })
+    if (showManageUsersDialog && selectedClass != null) ManageClassUsersDialog(user, selectedClass!!, onDismiss = { showManageUsersDialog = false })
 }
 
 @Composable
-fun ClassCard(
-    classEntity: ClassEntity,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onManageUsers: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = classEntity.className,
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            Text(
-                text = "Class ID: ${classEntity.classId}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onManageUsers,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Manage Users",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Users")
+fun ClassCard(user: User, classEntity: ClassEntity, onEdit: () -> Unit, onDelete: () -> Unit, onManageUsers: () -> Unit, onManageGroups: () -> Unit) {
+    val isAdmin = user.role.equals("Admin", ignoreCase = true)
+    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(2.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(classEntity.className, style = MaterialTheme.typography.titleLarge)
+            Text("Class ID: ${classEntity.classId}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onManageUsers, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (isAdmin) "Users" else "View Users", fontSize = 12.sp)
                 }
-
-                OutlinedButton(
-                    onClick = onEdit,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Edit")
+                Button(onClick = onManageGroups, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
+                    Icon(Icons.Default.Group, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Groups", fontSize = 12.sp)
                 }
-
-                OutlinedButton(
-                    onClick = onDelete,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Delete")
+            }
+            if (isAdmin) {
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) { Text("Edit") }
+                    OutlinedButton(onClick = onDelete, modifier = Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Delete") }
                 }
             }
         }
@@ -396,331 +229,245 @@ fun ClassCard(
 }
 
 @Composable
-fun EditClassDialog(
-    classEntity: ClassEntity,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
-) {
-    var newClassName by remember { mutableStateOf(classEntity.className) }
-    var isUpdating by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
+fun EditClassDialog(classEntity: ClassEntity, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    var name by remember { mutableStateOf(classEntity.className) }
     val scope = rememberCoroutineScope()
-
     AlertDialog(
-        onDismissRequest = { if (!isUpdating) onDismiss() },
+        onDismissRequest = onDismiss,
         title = { Text("Edit Class") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = newClassName,
-                    onValueChange = {
-                        newClassName = it
-                        errorMessage = null
-                    },
-                    label = { Text("Class Name") },
-                    enabled = !isUpdating,
-                    singleLine = true
-                )
-
-                errorMessage?.let { error ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (newClassName.isBlank()) {
-                        errorMessage = "Class name cannot be empty"
-                        return@TextButton
-                    }
-
-                    scope.launch {
-                        isUpdating = true
-                        val success = DatabaseHelper.updateClass(classEntity.classId, newClassName)
-                        if (success) {
-                            onConfirm(newClassName)
-                        } else {
-                            errorMessage = "Failed to update class"
-                        }
-                        isUpdating = false
-                    }
-                },
-                enabled = !isUpdating
-            ) {
-                if (isUpdating) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                } else {
-                    Text("Save")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isUpdating
-            ) {
-                Text("Cancel")
-            }
-        }
+        text = { OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Class Name") }) },
+        confirmButton = { Button(onClick = { scope.launch { if (DatabaseHelper.updateClass(classEntity.classId, name)) onConfirm() } }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
 
 @Composable
-fun DeleteClassDialog(
-    classEntity: ClassEntity,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    var isDeleting by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
+fun DeleteClassDialog(classEntity: ClassEntity, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     val scope = rememberCoroutineScope()
-
     AlertDialog(
-        onDismissRequest = { if (!isDeleting) onDismiss() },
+        onDismissRequest = onDismiss,
         title = { Text("Delete Class") },
-        text = {
-            Column {
-                Text("Are you sure you want to delete '${classEntity.className}'?")
-                Text(
-                    text = "This action cannot be undone and will remove all user associations.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-
-                errorMessage?.let { error ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    scope.launch {
-                        isDeleting = true
-                        val success = DatabaseHelper.deleteClass(classEntity.classId)
-                        if (success) {
-                            onConfirm()
-                        } else {
-                            errorMessage = "Failed to delete class"
-                        }
-                        isDeleting = false
-                    }
-                },
-                enabled = !isDeleting,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                )
-            ) {
-                if (isDeleting) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                } else {
-                    Text("Delete")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isDeleting
-            ) {
-                Text("Cancel")
-            }
-        }
+        text = { Text("Delete '${classEntity.className}'?") },
+        confirmButton = { Button(onClick = { scope.launch { if (DatabaseHelper.deleteClass(classEntity.classId)) onConfirm() } }, colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.error)) { Text("Delete") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
 
 @Composable
-fun ManageClassUsersDialog(
-    classEntity: ClassEntity,
-    onDismiss: () -> Unit
-) {
+fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -> Unit) {
     var allUsers by remember { mutableStateOf<List<User>>(emptyList()) }
-    var classUsers by remember { mutableStateOf<List<User>>(emptyList()) }
+    var classUserIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var isLoading by remember { mutableStateOf(true) }
     var isUpdating by remember { mutableStateOf(false) }
-    var loadError by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+    var pendingUserId by remember { mutableStateOf<Int?>(null) }
+    var searchKeyword by remember { mutableStateOf("") }
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var pendingUserId by remember { mutableStateOf<Int?>(null) } // Track which user is being updated
+    val tabs = listOf("Student", "Parent", "Teacher")
+    
+    var viewingUser by remember { mutableStateOf<User?>(null) }
 
+    val isAdmin = user.role.equals("Admin", ignoreCase = true)
     val scope = rememberCoroutineScope()
 
-    // Function to load all data
     suspend fun loadData() {
         isLoading = true
-        loadError = false
         errorMessage = null
-
-        val users = DatabaseHelper.getAllUsers()
-        val classUsersList = DatabaseHelper.getClassUsers(classEntity.classId)
-
-        // Check if we got valid data
-        if (users.isEmpty() && classUsersList.isEmpty()) {
-            // Could be error or genuinely empty - but if allUsers is empty, that's suspicious
-            println("WARNING: Both user lists are empty - possible load error")
-        }
-
-        allUsers = users
-        classUsers = classUsersList
+        allUsers = DatabaseHelper.getAllUsers()
+        classUserIds = DatabaseHelper.getClassUsers(classEntity.classId).map { it.userId }.toSet()
         isLoading = false
-
-        // If we couldn't load users at all, mark as error
-        if (users.isEmpty()) {
-            loadError = true
-            errorMessage = "Failed to load users. Tap Retry."
-        }
     }
 
-    // Load users on start
-    LaunchedEffect(Unit) {
+    LaunchedEffect(classEntity.classId) {
         loadData()
     }
 
-    val filteredUsers = remember(allUsers, searchQuery) {
-        if (searchQuery.isBlank()) {
-            allUsers
-        } else {
-            allUsers.filter { user ->
-                user.username.contains(searchQuery, ignoreCase = true) ||
-                user.fullName?.contains(searchQuery, ignoreCase = true) == true ||
-                user.role.contains(searchQuery, ignoreCase = true)
-            }
-        }
-    }
-
-    val classUserIds = remember(classUsers) {
-        classUsers.map { it.userId }.toSet()
+    if (viewingUser != null) {
+        ViewUserProfileDialog(user = viewingUser!!, onDismiss = { viewingUser = null })
     }
 
     AlertDialog(
         onDismissRequest = { if (!isUpdating) onDismiss() },
-        title = { Text("Manage Users - ${classEntity.className}") },
+        title = { Text(if (isAdmin) "Class Users" else "Class Members") },
         text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(500.dp)
-            ) {
+            Column(modifier = Modifier.fillMaxHeight(0.8f)) {
                 OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    label = { Text("Search users...") },
+                    value = searchKeyword,
+                    onValueChange = { searchKeyword = it },
+                    placeholder = { Text("Search users...") },
                     modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
                     singleLine = true,
                     enabled = !isLoading && !isUpdating
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Users in class: ${classUsers.size}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    // Refresh button
-                    TextButton(
-                        onClick = {
-                            scope.launch {
-                                loadData()
-                            }
-                        },
-                        enabled = !isLoading && !isUpdating
+                if (isAdmin) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(if (loadError) "Retry" else "Refresh")
+                        Text(
+                            text = "Users in class: ${classUserIds.size}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        TextButton(
+                            onClick = { scope.launch { loadData() } },
+                            enabled = !isLoading && !isUpdating
+                        ) { Text("Refresh") }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                TabRow(selectedTabIndex = selectedTabIndex) {
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTabIndex == index,
+                            onClick = { selectedTabIndex = index },
+                            text = { Text(title, fontSize = 12.sp) }
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 if (isLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Loading users...")
-                        }
-                    }
-                } else if (loadError && allUsers.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Failed to load users",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = {
-                                scope.launch { loadData() }
-                            }) {
-                                Text("Retry")
-                            }
-                        }
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        items(filteredUsers, key = { it.userId }) { user ->
-                            val isInClass = classUserIds.contains(user.userId)
-                            val isThisUserUpdating = pendingUserId == user.userId
+                    val selectedRole = tabs[selectedTabIndex]
+                    val filtered = allUsers.filter { u ->
+                        val matchesSearch = (u.fullName ?: u.username).contains(searchKeyword, true)
+                        val matchesRole = u.role.equals(selectedRole, ignoreCase = true)
+                        if (isAdmin) {
+                            // Admin sees ALL users (with toggle to add/remove)
+                            matchesSearch && matchesRole
+                        } else {
+                            // Non-admin only sees users already in class
+                            val isMember = classUserIds.contains(u.userId)
+                            matchesSearch && matchesRole && isMember
+                        }
+                    }
 
-                            UserListItem(
-                                user = user,
-                                isInClass = isInClass,
-                                isUpdating = isThisUserUpdating,
-                                enabled = !isUpdating,
-                                onToggle = { shouldAdd ->
-                                    scope.launch {
-                                        isUpdating = true
-                                        pendingUserId = user.userId
-                                        errorMessage = null
+                    if (filtered.isEmpty()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                if (isAdmin) "No ${selectedRole.lowercase()}s found."
+                                else "No ${selectedRole.lowercase()}s found in this class.",
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            items(filtered, key = { it.userId }) { item ->
+                                val isInClass = classUserIds.contains(item.userId)
+                                val isThisUserUpdating = pendingUserId == item.userId
 
-                                        val success = if (shouldAdd) {
-                                            DatabaseHelper.addUserToClass(classEntity.classId, user.userId)
-                                        } else {
-                                            DatabaseHelper.removeUserFromClass(classEntity.classId, user.userId)
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isInClass)
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        else
+                                            MaterialTheme.colorScheme.surface
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { viewingUser = item }
+                                            .padding(vertical = 8.dp, horizontal = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Profile Icon
+                                        val profileBitmap = remember(item.profileImageUrl) {
+                                            if (item.profileImageUrl != null && item.profileImageUrl.startsWith("data:image")) {
+                                                try {
+                                                    val base64String = item.profileImageUrl.substringAfter(",")
+                                                    val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
+                                                    BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                                                } catch (e: Exception) {
+                                                    null
+                                                }
+                                            } else {
+                                                null
+                                            }
                                         }
 
-                                        if (success) {
-                                            // Refresh class users with retry
-                                            val newClassUsers = DatabaseHelper.getClassUsers(classEntity.classId)
-                                            classUsers = newClassUsers
-                                            errorMessage = null
-                                        } else {
-                                            errorMessage = "Failed to update user. Try again."
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (profileBitmap != null) {
+                                                Image(
+                                                    bitmap = profileBitmap.asImageBitmap(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Default.Person,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(24.dp),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         }
 
-                                        pendingUserId = null
-                                        isUpdating = false
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(item.fullName ?: item.username, fontWeight = FontWeight.Bold)
+                                            Text(item.role, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+
+                                        // Toggle switch for admin to add/remove users
+                                        if (isAdmin) {
+                                            if (isThisUserUpdating) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(24.dp),
+                                                    strokeWidth = 2.dp
+                                                )
+                                            } else {
+                                                Switch(
+                                                    checked = isInClass,
+                                                    onCheckedChange = { shouldAdd ->
+                                                        scope.launch {
+                                                            isUpdating = true
+                                                            pendingUserId = item.userId
+                                                            errorMessage = null
+
+                                                            val success = if (shouldAdd) {
+                                                                DatabaseHelper.addUserToClass(classEntity.classId, item.userId)
+                                                            } else {
+                                                                DatabaseHelper.removeUserFromClass(classEntity.classId, item.userId)
+                                                            }
+
+                                                            if (success) {
+                                                                classUserIds = DatabaseHelper.getClassUsers(classEntity.classId).map { it.userId }.toSet()
+                                                            } else {
+                                                                errorMessage = "Failed to update user. Try again."
+                                                            }
+
+                                                            pendingUserId = null
+                                                            isUpdating = false
+                                                        }
+                                                    },
+                                                    enabled = !isUpdating
+                                                )
+                                            }
+                                        }
                                     }
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -735,75 +482,89 @@ fun ManageClassUsersDialog(
                 }
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isUpdating
-            ) {
-                Text("Close")
-            }
-        }
+        confirmButton = { Button(onClick = onDismiss, enabled = !isUpdating) { Text("Close") } }
     )
 }
 
 @Composable
-fun UserListItem(
-    user: User,
-    isInClass: Boolean,
-    isUpdating: Boolean = false,
-    enabled: Boolean = true,
-    onToggle: (Boolean) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isInClass)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(
-                    if (enabled && !isUpdating) {
-                        Modifier.clickable { onToggle(!isInClass) }
+fun ViewUserProfileDialog(user: User, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("User Profile") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val profileBitmap = remember(user.profileImageUrl) {
+                    if (user.profileImageUrl != null && user.profileImageUrl.startsWith("data:image")) {
+                        try {
+                            val base64String = user.profileImageUrl.substringAfter(",")
+                            val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
+                            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                        } catch (e: Exception) {
+                            null
+                        }
                     } else {
-                        Modifier
+                        null
                     }
-                )
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = user.fullName ?: user.username,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-                Text(
-                    text = "${user.username} • ${user.role}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                )
-            }
+                }
 
-            if (isUpdating) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Switch(
-                    checked = isInClass,
-                    onCheckedChange = { if (enabled) onToggle(it) },
-                    enabled = enabled
-                )
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (profileBitmap != null) {
+                        Image(
+                            bitmap = profileBitmap.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(60.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(text = user.fullName ?: user.username, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(text = "@${user.username}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                
+                Spacer(modifier = Modifier.height(24.dp))
+
+                ProfileInfoRow(label = "Account Created", value = user.createdAt.substringBefore(" "))
             }
-        }
+        },
+        confirmButton = { Button(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
+@Composable
+fun ProfileInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.width(12.dp)) // Shortened gap for better balance
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold
+        )
     }
 }

@@ -1,15 +1,27 @@
 package com.example.mobsec_823.ui.screens
 
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LibraryBooks
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.example.mobsec_823.data.DatabaseHelper
 import com.example.mobsec_823.data.Question
@@ -20,7 +32,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun TeacherDashboardScreen(
     teacher: User,
-    onLogout: () -> Unit
+    onNavigateToProfile: () -> Unit,
+    onNavigateToResourceLibrary: () -> Unit,
+    onBackClick: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var questions by remember { mutableStateOf<List<Question>>(emptyList()) }
@@ -29,10 +43,7 @@ fun TeacherDashboardScreen(
     val refreshQuestions = {
         scope.launch {
             isLoading = true
-            // Fetch questions assigned to this teacher
             val fetched = DatabaseHelper.getQuestionsForTeacher(teacher.userId)
-
-            // Filter for unanswered and sort by priority: High (3) > Normal (2) > Low (1)
             questions = fetched.filter { it.answer.isNullOrBlank() }
                 .sortedByDescending {
                     when (it.priority.lowercase()) {
@@ -53,10 +64,15 @@ fun TeacherDashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pending Questions") },
+                title = { Text("Teacher Dashboard") },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu")
+                    }
+                },
                 actions = {
-                    TextButton(onClick = onLogout) {
-                        Text("Logout", color = MaterialTheme.colorScheme.error)
+                    IconButton(onClick = onNavigateToResourceLibrary) {
+                        Icon(Icons.Default.LibraryBooks, contentDescription = "Resource Library")
                     }
                 }
             )
@@ -68,11 +84,19 @@ fun TeacherDashboardScreen(
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (questions.isEmpty()) {
-                Text(
-                    "No unanswered questions found.",
+                Column(
                     modifier = Modifier.align(Alignment.Center),
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "No unanswered questions found.",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = onNavigateToResourceLibrary) {
+                        Text("Go to Resource Library")
+                    }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -99,20 +123,18 @@ fun QuestionCard(question: Question, onAnswerSubmitted: () -> Unit) {
     var isSubmitting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    // Background color based on priority to help teacher prioritize visually
     val priorityColor = when (question.priority.lowercase()) {
-        "high" -> Color(0xFFFFEBEE) // Light Red
-        "normal" -> Color(0xFFFFFDE7) // Light Yellow
-        else -> Color(0xFFF1F8E9) // Light Green
+        "high" -> Color(0xFFFFEBEE)
+        "normal" -> Color(0xFFFFFDE7)
+        else -> Color(0xFFF1F8E9)
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = priorityColor),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header: Who asked and When
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -131,7 +153,6 @@ fun QuestionCard(question: Question, onAnswerSubmitted: () -> Unit) {
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Priority Label
             Text(
                 text = "PRIORITY: ${question.priority.uppercase()}",
                 style = MaterialTheme.typography.labelSmall,
@@ -141,7 +162,6 @@ fun QuestionCard(question: Question, onAnswerSubmitted: () -> Unit) {
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 0.5.dp)
 
-            // The Question
             Text(
                 text = "Question:",
                 style = MaterialTheme.typography.labelMedium,
@@ -155,7 +175,6 @@ fun QuestionCard(question: Question, onAnswerSubmitted: () -> Unit) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Answer Input Field
             OutlinedTextField(
                 value = answerText,
                 onValueChange = { answerText = it },
@@ -170,7 +189,6 @@ fun QuestionCard(question: Question, onAnswerSubmitted: () -> Unit) {
                     if (answerText.isNotBlank()) {
                         scope.launch {
                             isSubmitting = true
-                            // Calls the PUT /api/questions/<id>/answer endpoint
                             val success = DatabaseHelper.answerQuestion(question.questionId, answerText)
                             if (success) onAnswerSubmitted()
                             isSubmitting = false

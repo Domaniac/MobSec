@@ -1,10 +1,15 @@
 package com.example.mobsec_823.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.mobsec_823.data.User
 
@@ -12,6 +17,7 @@ import com.example.mobsec_823.data.User
 @Composable
 fun HomeMenuScreen(
     user: User,
+    onNavigateToProfile: () -> Unit,
     onNavigateToForum: () -> Unit,
     onNavigateToClassManagement: () -> Unit,
     onNavigateToStudentQuery: () -> Unit,
@@ -19,15 +25,17 @@ fun HomeMenuScreen(
     onNavigateToTeacherDashboard: () -> Unit,
     onNavigateToGroupManagement: () -> Unit,
     onNavigateToLocationSharing: () -> Unit,
-    onLogout: () -> Unit
+    onNavigateToResourceLibrary: () -> Unit,
+    onNavigateToAdminTeacherManagement: () -> Unit = {},
+    onMenuClick: () -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("MobSec Home") },
-                actions = {
-                    TextButton(onClick = onLogout) {
-                        Text("Logout")
+                navigationIcon = {
+                    IconButton(onClick = onMenuClick) {
+                        Icon(Icons.Default.Menu, contentDescription = "Menu")
                     }
                 }
             )
@@ -37,13 +45,15 @@ fun HomeMenuScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = "Welcome, ${user.fullName ?: user.username}!",
                 style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
@@ -68,10 +78,10 @@ fun HomeMenuScreen(
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
-                    UserInfoRow(label = "Username", value = user.username)
-                    UserInfoRow(label = "Full Name", value = user.fullName ?: "N/A")
-                    UserInfoRow(label = "Role", value = user.role)
-                    UserInfoRow(label = "User ID", value = user.userId.toString())
+                    HomeUserInfoRow(label = "Username", value = user.username)
+                    HomeUserInfoRow(label = "Full Name", value = user.fullName ?: "N/A")
+                    HomeUserInfoRow(label = "Role", value = user.role)
+                    HomeUserInfoRow(label = "User ID", value = user.userId.toString())
                 }
             }
 
@@ -99,13 +109,30 @@ fun HomeMenuScreen(
                 )
             }
 
+            val buttonModifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp)
+                .padding(bottom = 12.dp)
+
+            // Profile button
+            Button(
+                onClick = onNavigateToProfile,
+                modifier = buttonModifier,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            ) {
+                Text(
+                    text = "My Profile",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
             // Discussion Forum button (available to all users)
             Button(
                 onClick = onNavigateToForum,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .padding(bottom = 12.dp),
+                modifier = buttonModifier,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
                 )
@@ -115,54 +142,99 @@ fun HomeMenuScreen(
                     style = MaterialTheme.typography.titleMedium
                 )
             }
+
+            // Resource Library button (available to all users)
+            Button(
+                onClick = onNavigateToResourceLibrary,
+                modifier = buttonModifier,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(
+                    text = "Resource Library",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+            // Student Specific Options
             if (user.role.equals("Student", ignoreCase = true)) {
                 Button(
                     onClick = onNavigateToStudentDashboard,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    modifier = buttonModifier
                 ) {
-                    Text("My Question History")
+                    Text("My Question History", style = MaterialTheme.typography.titleMedium)
+                }
+
+                Button(
+                    onClick = onNavigateToStudentQuery,
+                    modifier = buttonModifier
+                ) {
+                    Text("Ask a Question", style = MaterialTheme.typography.titleMedium)
+                }
+
+                Button(
+                    onClick = onNavigateToGroupManagement,
+                    modifier = buttonModifier
+                ) {
+                    Text("My Group & Members", style = MaterialTheme.typography.titleMedium)
                 }
             }
-            if (user.role == "Teacher") {
-                Spacer(modifier = Modifier.height(12.dp))
+
+            // Teacher Specific Options
+            if (user.role.equals("Teacher", ignoreCase = true)) {
                 Button(
                     onClick = onNavigateToTeacherDashboard,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = buttonModifier,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                 ) {
-                    Text("Teacher Dashboard (Questions)")
+                    Text("Teacher Dashboard (Questions)", style = MaterialTheme.typography.titleMedium)
                 }
             }
 
-            // Show Student Query button ONLY if user is a student
-            if (user.role == "Student") {
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = onNavigateToStudentQuery, modifier = Modifier.fillMaxWidth()) {
-                    Text("Ask a Question")
-                }
-            }
+            val isAdmin = user.role.equals("Admin", ignoreCase = true)
+            val isTeacher = user.role.equals("Teacher", ignoreCase = true)
 
-            if (user.role == "Student") {
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = onNavigateToGroupManagement, modifier = Modifier.fillMaxWidth()) {
-                    Text("My Group & Members")
-                }
-            }
-
-            // Class Management button (only for Teachers and Admins)
-            if (user.role.equals("Teacher", ignoreCase = true) ||
-                user.role.equals("Admin", ignoreCase = true)) {
+            // Class Management and Group Management buttons (only for Teachers and Admins)
+            if (isAdmin || isTeacher) {
                 Button(
                     onClick = onNavigateToClassManagement,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp),
+                    modifier = buttonModifier,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.secondary
                     )
                 ) {
                     Text(
-                        text = "Manage Classes",
+                        text = if (isAdmin) "Manage Classes" else "View Classes",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                Button(
+                    onClick = onNavigateToGroupManagement,
+                    modifier = buttonModifier,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary
+                    )
+                ) {
+                    Text(
+                        text = "Manage Groups",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+
+            // Admin-only: Manage Admins & Teachers
+            if (isAdmin) {
+                Button(
+                    onClick = onNavigateToAdminTeacherManagement,
+                    modifier = buttonModifier,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text(
+                        text = "Manage Admins & Teachers",
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
@@ -172,7 +244,7 @@ fun HomeMenuScreen(
 }
 
 @Composable
-fun UserInfoRow(label: String, value: String) {
+private fun HomeUserInfoRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -191,4 +263,3 @@ fun UserInfoRow(label: String, value: String) {
         )
     }
 }
-

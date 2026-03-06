@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -37,9 +39,11 @@ fun StudentDashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Questions") },
+                title = { Text("My Question History") },
                 navigationIcon = {
-                    TextButton(onClick = onBackClick) { Text("Back") }
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.Default.Menu, contentDescription = "Menu")
+                    }
                 }
             )
         }
@@ -74,7 +78,7 @@ fun StudentQuestionCard(question: Question) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { expanded = !expanded },
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
