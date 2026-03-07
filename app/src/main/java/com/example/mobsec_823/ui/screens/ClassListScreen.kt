@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,24 +28,32 @@ fun ClassListScreen(
     var classes by remember { mutableStateOf<List<ClassEntity>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
-    // Load classes
-    LaunchedEffect(user.userId) {
-        isLoading = true
-        errorMessage = null
-        try {
-            // For Teacher/Admin, show all classes
-            if (user.role.equals("Teacher", ignoreCase = true) || user.role.equals("Admin", ignoreCase = true)) {
-                classes = DatabaseHelper.getAllClasses()
-            } else {
-                classes = DatabaseHelper.getUserClasses(user.userId)
+    // Reusable refresh function
+    val refreshClasses: () -> Unit = {
+        scope.launch {
+            isLoading = true
+            errorMessage = null
+            try {
+                // For Teacher/Admin, show all classes
+                if (user.role.equals("Teacher", ignoreCase = true) || user.role.equals("Admin", ignoreCase = true)) {
+                    classes = DatabaseHelper.getAllClasses()
+                } else {
+                    classes = DatabaseHelper.getUserClasses(user.userId)
+                }
+            } catch (e: Exception) {
+                errorMessage = "Failed to load classes: ${e.message}"
+                e.printStackTrace()
+            } finally {
+                isLoading = false
             }
-        } catch (e: Exception) {
-            errorMessage = "Failed to load classes: ${e.message}"
-            e.printStackTrace()
-        } finally {
-            isLoading = false
         }
+    }
+
+    // Load classes on first launch
+    LaunchedEffect(user.userId) {
+        refreshClasses()
     }
 
     Scaffold(
@@ -54,6 +63,11 @@ fun ClassListScreen(
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
                         Icon(Icons.Default.Menu, contentDescription = "Menu")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { refreshClasses() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
                 }
             )

@@ -6,11 +6,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,15 +25,23 @@ import kotlinx.coroutines.launch
 @Composable
 fun StudentDashboardScreen(
     user: User,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onAddQuestion: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var questions by remember { mutableStateOf<List<Question>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
+    val refreshQuestions = {
+        scope.launch {
+            isLoading = true
+            questions = DatabaseHelper.getQuestionsByStudent(user.userId)
+            isLoading = false
+        }
+    }
+
     LaunchedEffect(Unit) {
-        questions = DatabaseHelper.getQuestionsByStudent(user.userId)
-        isLoading = false
+        refreshQuestions()
     }
 
     Scaffold(
@@ -44,8 +52,22 @@ fun StudentDashboardScreen(
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.Menu, contentDescription = "Menu")
                     }
+                },
+                actions = {
+                    IconButton(onClick = { refreshQuestions() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onAddQuestion,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Ask Question")
+            }
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {

@@ -62,16 +62,14 @@ object DatabaseHelper {
         studentEmployeeNumber: String,
         passwordHash: String,
         role: String,
-        fullName: String,
-        profileImageUrl: String?
+        fullName: String
     ): RegisterResult {
         val body = gson.toJson(mapOf(
             "username" to username,
             "student_employee_number" to studentEmployeeNumber,
             "password" to passwordHash,
             "role" to role,
-            "full_name" to fullName,
-            "profile_image_url" to profileImageUrl
+            "full_name" to fullName
         ))
         val json = SimpleApi.post("/api/register", body) ?: return RegisterResult.Failure("Network error")
         Log.d(TAG, "Register response: $json")
@@ -92,13 +90,32 @@ object DatabaseHelper {
         return if (response?.success == true) response.users ?: emptyList() else emptyList()
     }
 
-    suspend fun updateUserProfile(userId: Int, username: String?, profileImageUrl: String?): Boolean {
+    suspend fun updateUserProfile(userId: Int, username: String?): Boolean {
         val bodyMap = mutableMapOf<String, String>()
         if (username != null) bodyMap["username"] = username
-        if (profileImageUrl != null) bodyMap["profile_image_url"] = profileImageUrl
         
         val body = gson.toJson(bodyMap)
         val json = SimpleApi.put("/api/user/$userId", body) ?: return false
+        val response = safeParse(json, SimpleResponse::class.java)
+        return response?.success == true
+    }
+
+    suspend fun deleteUser(userId: Int): Boolean {
+        val json = SimpleApi.delete("/api/user/$userId") ?: return false
+        val response = safeParse(json, SimpleResponse::class.java)
+        return response?.success == true
+    }
+
+    /**
+     * Upload a profile image as binary (JPEG bytes) to the server.
+     * Returns true on success, false on failure.
+     */
+    suspend fun uploadProfileImage(userId: Int, imageBytes: ByteArray): Boolean {
+        val json = SimpleApi.putMultipartImageBytes(
+            "/api/user/$userId/profile-image",
+            imageBytes,
+            "profile_$userId.jpg"
+        ) ?: return false
         val response = safeParse(json, SimpleResponse::class.java)
         return response?.success == true
     }
@@ -297,6 +314,38 @@ object DatabaseHelper {
         val json = SimpleApi.get("/api/classes/$classId/unassigned") ?: return emptyList()
         val response = safeParse(json, UserResponse::class.java)
         return if (response?.success == true) response.users ?: emptyList() else emptyList()
+    }
+
+    suspend fun getClassGroups(classId: Int): List<GroupEntity> {
+        val json = SimpleApi.get("/api/classes/$classId/groups") ?: return emptyList()
+        val response = safeParse(json, GroupResponse::class.java)
+        return if (response?.success == true) response.groups ?: emptyList() else emptyList()
+    }
+
+    suspend fun createGroup(classId: Int, groupName: String): GroupEntity? {
+        val body = gson.toJson(mapOf("class_id" to classId, "group_name" to groupName))
+        val json = SimpleApi.post("/api/classes/$classId/groups", body) ?: return null
+        val response = safeParse(json, GroupResponse::class.java)
+        return if (response?.success == true) response.group else null
+    }
+
+    suspend fun deleteGroup(classId: Int, groupId: Int): Boolean {
+        val json = SimpleApi.delete("/api/classes/$classId/groups/$groupId") ?: return false
+        val response = safeParse(json, SimpleResponse::class.java)
+        return response?.success == true
+    }
+
+    suspend fun addUserToGroup(classId: Int, groupId: Int, userId: Int): Boolean {
+        val body = gson.toJson(mapOf("user_id" to userId))
+        val json = SimpleApi.post("/api/classes/$classId/groups/$groupId/members", body) ?: return false
+        val response = safeParse(json, SimpleResponse::class.java)
+        return response?.success == true
+    }
+
+    suspend fun removeUserFromGroup(classId: Int, groupId: Int, userId: Int): Boolean {
+        val json = SimpleApi.delete("/api/classes/$classId/groups/$groupId/members/$userId") ?: return false
+        val response = safeParse(json, SimpleResponse::class.java)
+        return response?.success == true
     }
 
     // ========== Resource Operations ==========

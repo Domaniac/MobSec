@@ -46,7 +46,9 @@ data class LoginResponse(
 data class GroupResponse(
     val success: Boolean,
     val group: GroupEntity? = null,
-    val message: String? = null
+    val groups: List<GroupEntity>? = null,
+    val message: String? = null,
+    val error: String? = null
 )
 
 data class ClassResponse(

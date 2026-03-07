@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,12 +19,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mobsec_823.data.ClassEntity
 import com.example.mobsec_823.data.DatabaseHelper
 import com.example.mobsec_823.data.User
+import com.example.mobsec_823.ui.rememberProfileBitmap
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,10 +36,15 @@ fun ClassManagementScreen(
 ) {
     var classes by remember { mutableStateOf<List<ClassEntity>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableIntStateOf(if (user.role.equals("Admin", ignoreCase = true)) 0 else 1) }
 
     val isAdmin = user.role.equals("Admin", ignoreCase = true)
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Create class dialog state
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var newClassName by remember { mutableStateOf("") }
+    var isCreating by remember { mutableStateOf(false) }
 
     // Load classes based on role
     val refreshClasses = {
@@ -62,13 +66,29 @@ fun ClassManagementScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (isAdmin) "Class Management" else "My Classes") },
+                title = { Text(if (isAdmin) "Class Management" else "My Classes & Groups") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu")
                     }
+                },
+                actions = {
+                    IconButton(onClick = { refreshClasses() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
                 }
             )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            if (isAdmin) {
+                FloatingActionButton(
+                    onClick = { showCreateDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Create Class")
+                }
+            }
         }
     ) { paddingValues ->
         Column(
@@ -76,77 +96,69 @@ fun ClassManagementScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (isAdmin) {
-                TabRow(selectedTabIndex = selectedTab) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text("Create Class") }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text("Manage Classes") }
-                    )
-                }
-            }
-
-            when (selectedTab) {
-                0 -> if (isAdmin) {
-                    CreateClassTab(onClassCreated = { refreshClasses() })
-                }
-                1 -> ManageClassesTab(
-                    user = user,
-                    classes = classes,
-                    isLoading = isLoading,
-                    onRefresh = { refreshClasses() },
-                    onManageGroups = onManageGroups
-                )
-            }
+            ManageClassesTab(
+                user = user,
+                classes = classes,
+                isLoading = isLoading,
+                onRefresh = { refreshClasses() },
+                onManageGroups = onManageGroups,
+                snackbarHostState = snackbarHostState
+            )
         }
     }
-}
 
-@Composable
-fun CreateClassTab(onClassCreated: () -> Unit) {
-    var className by remember { mutableStateOf("") }
-    var isCreating by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var successMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Create New Class", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
-        OutlinedTextField(
-            value = className,
-            onValueChange = { className = it; errorMessage = null; successMessage = null },
-            label = { Text("Class Name") },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isCreating,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            singleLine = true
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = {
-                if (className.isBlank()) { errorMessage = "Class name cannot be empty"; return@Button }
-                scope.launch {
-                    isCreating = true
-                    val createdClass = DatabaseHelper.createClass(className)
-                    if (createdClass != null) {
-                        successMessage = "Class '${createdClass.className}' created!"; className = ""; onClassCreated()
-                    } else { errorMessage = "Failed to create class" }
-                    isCreating = false
+    // ===== Create Class Dialog =====
+    if (showCreateDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showCreateDialog = false
+                newClassName = ""
+            },
+            title = { Text("Create New Class") },
+            text = {
+                OutlinedTextField(
+                    value = newClassName,
+                    onValueChange = { newClassName = it },
+                    label = { Text("Class Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newClassName.isNotBlank() && !isCreating) {
+                            val nameToCreate = newClassName.trim()
+                            isCreating = true
+                            showCreateDialog = false
+                            newClassName = ""
+                            scope.launch {
+                                val createdClass = DatabaseHelper.createClass(nameToCreate)
+                                isCreating = false
+                                refreshClasses()
+                                kotlinx.coroutines.delay(200)
+                                if (createdClass != null) {
+                                    snackbarHostState.showSnackbar("Class '${createdClass.className}' created!")
+                                } else {
+                                    snackbarHostState.showSnackbar("Failed to create class")
+                                }
+                            }
+                        }
+                    },
+                    enabled = newClassName.isNotBlank() && !isCreating
+                ) {
+                    Text("Create")
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isCreating
-        ) {
-            if (isCreating) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
-            else Text("Create Class")
-        }
-        errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 16.dp)) }
-        successMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 16.dp)) }
+            dismissButton = {
+                TextButton(onClick = {
+                    showCreateDialog = false
+                    newClassName = ""
+                }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -156,20 +168,17 @@ fun ManageClassesTab(
     classes: List<ClassEntity>,
     isLoading: Boolean,
     onRefresh: () -> Unit,
-    onManageGroups: (ClassEntity) -> Unit
+    onManageGroups: (ClassEntity) -> Unit,
+    snackbarHostState: SnackbarHostState
 ) {
     var selectedClass by remember { mutableStateOf<ClassEntity?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showManageUsersDialog by remember { mutableStateOf(false) }
     val isAdmin = user.role.equals("Admin", ignoreCase = true)
+    val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(text = if (isAdmin) "All Classes" else "Assigned Classes", style = MaterialTheme.typography.headlineSmall)
-            IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, "Refresh") }
-        }
-        Spacer(modifier = Modifier.height(16.dp))
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         } else if (classes.isEmpty()) {
@@ -193,13 +202,34 @@ fun ManageClassesTab(
     }
 
     if (showEditDialog && selectedClass != null) EditClassDialog(selectedClass!!, onDismiss = { showEditDialog = false }, onConfirm = { onRefresh(); showEditDialog = false })
-    if (showDeleteDialog && selectedClass != null) DeleteClassDialog(selectedClass!!, onDismiss = { showDeleteDialog = false }, onConfirm = { onRefresh(); showDeleteDialog = false })
+    if (showDeleteDialog && selectedClass != null) {
+        val classToDelete = selectedClass!!
+        DeleteClassDialog(
+            classToDelete,
+            onDismiss = { showDeleteDialog = false; selectedClass = null },
+            onConfirm = { success ->
+                showDeleteDialog = false
+                selectedClass = null
+                onRefresh()
+                scope.launch {
+                    kotlinx.coroutines.delay(200)
+                    if (success) {
+                        snackbarHostState.showSnackbar("Class '${classToDelete.className}' deleted!")
+                    } else {
+                        snackbarHostState.showSnackbar("Failed to delete class")
+                    }
+                }
+            }
+        )
+    }
     if (showManageUsersDialog && selectedClass != null) ManageClassUsersDialog(user, selectedClass!!, onDismiss = { showManageUsersDialog = false })
 }
 
 @Composable
 fun ClassCard(user: User, classEntity: ClassEntity, onEdit: () -> Unit, onDelete: () -> Unit, onManageUsers: () -> Unit, onManageGroups: () -> Unit) {
     val isAdmin = user.role.equals("Admin", ignoreCase = true)
+    val isStudent = user.role.equals("Student", ignoreCase = true)
+    
     Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(2.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(classEntity.className, style = MaterialTheme.typography.titleLarge)
@@ -209,12 +239,17 @@ fun ClassCard(user: User, classEntity: ClassEntity, onEdit: () -> Unit, onDelete
                 Button(onClick = onManageUsers, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(if (isAdmin) "Users" else "View Users", fontSize = 12.sp)
+                    val userLabel = when {
+                        isAdmin -> "Users"
+                        isStudent -> "Users"
+                        else -> "View Users"
+                    }
+                    Text(userLabel, fontSize = 12.sp)
                 }
                 Button(onClick = onManageGroups, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
                     Icon(Icons.Default.Group, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Groups", fontSize = 12.sp)
+                    Text(if (isStudent) "My Group" else "Groups", fontSize = 12.sp)
                 }
             }
             if (isAdmin) {
@@ -242,13 +277,23 @@ fun EditClassDialog(classEntity: ClassEntity, onDismiss: () -> Unit, onConfirm: 
 }
 
 @Composable
-fun DeleteClassDialog(classEntity: ClassEntity, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+fun DeleteClassDialog(classEntity: ClassEntity, onDismiss: () -> Unit, onConfirm: (Boolean) -> Unit) {
     val scope = rememberCoroutineScope()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Delete Class") },
         text = { Text("Delete '${classEntity.className}'?") },
-        confirmButton = { Button(onClick = { scope.launch { if (DatabaseHelper.deleteClass(classEntity.classId)) onConfirm() } }, colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.error)) { Text("Delete") } },
+        confirmButton = {
+            Button(
+                onClick = {
+                    scope.launch {
+                        val success = DatabaseHelper.deleteClass(classEntity.classId)
+                        onConfirm(success)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.error)
+            ) { Text("Delete") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
@@ -263,8 +308,8 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
     var searchKeyword by remember { mutableStateOf("") }
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val tabs = listOf("Student", "Parent", "Teacher")
-    
+    val tabs = listOf("All", "Student", "Parent", "Teacher")
+
     var viewingUser by remember { mutableStateOf<User?>(null) }
 
     val isAdmin = user.role.equals("Admin", ignoreCase = true)
@@ -273,7 +318,12 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
     suspend fun loadData() {
         isLoading = true
         errorMessage = null
-        allUsers = DatabaseHelper.getAllUsers()
+        if (isAdmin) {
+            allUsers = DatabaseHelper.getAllUsers()
+        } else {
+            // Students and teachers only see class members
+            allUsers = DatabaseHelper.getClassUsers(classEntity.classId)
+        }
         classUserIds = DatabaseHelper.getClassUsers(classEntity.classId).map { it.userId }.toSet()
         isLoading = false
     }
@@ -288,7 +338,10 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
 
     AlertDialog(
         onDismissRequest = { if (!isUpdating) onDismiss() },
-        title = { Text(if (isAdmin) "Class Users" else "Class Members") },
+        title = { 
+            val dialogTitle = if (isAdmin) "Class Users" else "Class Members"
+            Text(dialogTitle) 
+        },
         text = {
             Column(modifier = Modifier.fillMaxHeight(0.8f)) {
                 OutlinedTextField(
@@ -327,7 +380,14 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
                         Tab(
                             selected = selectedTabIndex == index,
                             onClick = { selectedTabIndex = index },
-                            text = { Text(title, fontSize = 12.sp) }
+                            text = {
+                                Text(
+                                    title,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
                         )
                     }
                 }
@@ -342,12 +402,11 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
                     val selectedRole = tabs[selectedTabIndex]
                     val filtered = allUsers.filter { u ->
                         val matchesSearch = (u.fullName ?: u.username).contains(searchKeyword, true)
-                        val matchesRole = u.role.equals(selectedRole, ignoreCase = true)
+                        val matchesRole = selectedRole == "All" || u.role.equals(selectedRole, ignoreCase = true)
                         if (isAdmin) {
-                            // Admin sees ALL users (with toggle to add/remove)
                             matchesSearch && matchesRole
                         } else {
-                            // Non-admin only sees users already in class
+                            // Students and teachers see everyone who is a member of the class
                             val isMember = classUserIds.contains(u.userId)
                             matchesSearch && matchesRole && isMember
                         }
@@ -362,7 +421,10 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
                             )
                         }
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             items(filtered, key = { it.userId }) { item ->
                                 val isInClass = classUserIds.contains(item.userId)
                                 val isThisUserUpdating = pendingUserId == item.userId
@@ -384,19 +446,7 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         // Profile Icon
-                                        val profileBitmap = remember(item.profileImageUrl) {
-                                            if (item.profileImageUrl != null && item.profileImageUrl.startsWith("data:image")) {
-                                                try {
-                                                    val base64String = item.profileImageUrl.substringAfter(",")
-                                                    val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
-                                                    BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                                                } catch (e: Exception) {
-                                                    null
-                                                }
-                                            } else {
-                                                null
-                                            }
-                                        }
+                                        val profileBitmap = rememberProfileBitmap(item.profileImageUrl)
 
                                         Box(
                                             modifier = Modifier
@@ -452,7 +502,8 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
                                                             }
 
                                                             if (success) {
-                                                                classUserIds = DatabaseHelper.getClassUsers(classEntity.classId).map { it.userId }.toSet()
+                                                                classUserIds = DatabaseHelper.getClassUsers(classEntity.classId)
+                                                                    .map { it.userId }.toSet()
                                                             } else {
                                                                 errorMessage = "Failed to update user. Try again."
                                                             }
@@ -496,19 +547,7 @@ fun ViewUserProfileDialog(user: User, onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                val profileBitmap = remember(user.profileImageUrl) {
-                    if (user.profileImageUrl != null && user.profileImageUrl.startsWith("data:image")) {
-                        try {
-                            val base64String = user.profileImageUrl.substringAfter(",")
-                            val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
-                            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                        } catch (e: Exception) {
-                            null
-                        }
-                    } else {
-                        null
-                    }
-                }
+                val profileBitmap = rememberProfileBitmap(user.profileImageUrl)
 
                 Box(
                     modifier = Modifier

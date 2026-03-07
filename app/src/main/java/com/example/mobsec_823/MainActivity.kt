@@ -25,7 +25,9 @@ import androidx.compose.ui.unit.dp
 import com.example.mobsec_823.data.ClassEntity
 import com.example.mobsec_823.data.DatabaseHelper
 import com.example.mobsec_823.data.User
+import com.example.mobsec_823.ui.rememberProfileBitmap
 import com.example.mobsec_823.ui.screens.*
+import com.example.mobsec_823.ui.screens.RegisterScreen
 import com.example.mobsec_823.ui.theme.MobSecTheme
 import kotlinx.coroutines.launch
 
@@ -51,6 +53,7 @@ fun MobSecApp() {
     var currentUser by remember { mutableStateOf<User?>(null) }
     var selectedClass by remember { mutableStateOf<ClassEntity?>(null) }
     var groupManagementFromClassManagement by remember { mutableStateOf(false) }
+    var adminManagementSelectedTab by remember { mutableIntStateOf(0) }
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -77,19 +80,7 @@ fun MobSecApp() {
                                 .padding(20.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                val profileBitmap = remember(user.profileImageUrl) {
-                                    if (user.profileImageUrl != null && user.profileImageUrl.startsWith("data:image")) {
-                                        try {
-                                            val base64String = user.profileImageUrl.substringAfter(",")
-                                            val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
-                                            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                                        } catch (e: Exception) {
-                                            null
-                                        }
-                                    } else {
-                                        null
-                                    }
-                                }
+                                val profileBitmap = rememberProfileBitmap(user.profileImage)
 
                                 Box(
                                     modifier = Modifier
@@ -158,13 +149,6 @@ fun MobSecApp() {
 
                         if (user.role.equals("Student", ignoreCase = true)) {
                             NavigationDrawerItem(
-                                label = { Text("Ask a Question") },
-                                selected = currentScreen == Screen.StudentQuery,
-                                onClick = { navigateTo(Screen.StudentQuery) },
-                                icon = { Icon(Icons.Default.QuestionAnswer, contentDescription = null) },
-                                modifier = Modifier.padding(NavigationDrawerItemPadding)
-                            )
-                            NavigationDrawerItem(
                                 label = { Text("My Question History") },
                                 selected = currentScreen == Screen.StudentDashboard,
                                 onClick = { navigateTo(Screen.StudentDashboard) },
@@ -172,11 +156,10 @@ fun MobSecApp() {
                                 modifier = Modifier.padding(NavigationDrawerItemPadding)
                             )
                             NavigationDrawerItem(
-                                label = { Text("My Group") },
-                                selected = currentScreen == Screen.GroupManagement,
+                                label = { Text("My Classes & Groups") },
+                                selected = currentScreen == Screen.ClassManagement || currentScreen == Screen.GroupManagement,
                                 onClick = {
-                                    groupManagementFromClassManagement = false
-                                    navigateTo(Screen.GroupManagement)
+                                    navigateTo(Screen.ClassManagement)
                                 },
                                 icon = { Icon(Icons.Default.Group, contentDescription = null) },
                                 modifier = Modifier.padding(NavigationDrawerItemPadding)
@@ -198,33 +181,33 @@ fun MobSecApp() {
 
                         if (isAdmin || isTeacher) {
                             NavigationDrawerItem(
-                                label = { Text(if (isAdmin) "Manage Classes" else "View Classes") },
-                                selected = currentScreen == Screen.ClassManagement,
+                                label = { Text(if (isAdmin) "Manage Classes & Groups" else "My Classes & Groups") },
+                                selected = currentScreen == Screen.ClassManagement || currentScreen == Screen.GroupManagement || currentScreen == Screen.GroupClassList,
                                 onClick = { navigateTo(Screen.ClassManagement) },
                                 icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                                 modifier = Modifier.padding(NavigationDrawerItemPadding)
                             )
-                            // Shortcut to Groups
-                            NavigationDrawerItem(
-                                label = { Text("Manage Groups") },
-                                selected = currentScreen == Screen.GroupClassList,
-                                onClick = {
-                                    navigateTo(Screen.GroupClassList)
-                                },
-                                icon = { Icon(Icons.Default.Group, contentDescription = null) },
-                                modifier = Modifier.padding(NavigationDrawerItemPadding)
-                            )
                         }
+
 
                         if (isAdmin) {
                             NavigationDrawerItem(
-                                label = { Text("Manage Admins & Teachers") },
+                                label = { Text("Manage Users") },
                                 selected = currentScreen == Screen.AdminTeacherManagement,
                                 onClick = { navigateTo(Screen.AdminTeacherManagement) },
                                 icon = { Icon(Icons.Default.SupervisedUserCircle, contentDescription = null) },
                                 modifier = Modifier.padding(NavigationDrawerItemPadding)
                             )
                         }
+
+                        // Share & View Locations is always the last functional navigation item
+                        NavigationDrawerItem(
+                            label = { Text("Share & View Locations") },
+                            selected = currentScreen == Screen.LocationSharing,
+                            onClick = { navigateTo(Screen.LocationSharing) },
+                            icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                        )
 
                         Spacer(modifier = Modifier.weight(1f))
                         NavigationDrawerItem(
@@ -248,10 +231,12 @@ fun MobSecApp() {
                 currentUser = currentUser,
                 selectedClass = selectedClass,
                 groupManagementFromClassManagement = groupManagementFromClassManagement,
+                adminManagementSelectedTab = adminManagementSelectedTab,
                 onScreenChange = { currentScreen = it },
                 onUserChange = { currentUser = it },
                 onClassChange = { selectedClass = it },
                 onGroupManagementFromClassManagementChange = { groupManagementFromClassManagement = it },
+                onAdminManagementSelectedTabChange = { adminManagementSelectedTab = it },
                 onOpenDrawer = { scope.launch { drawerState.open() } }
             )
         }
@@ -261,10 +246,12 @@ fun MobSecApp() {
             currentUser = currentUser,
             selectedClass = selectedClass,
             groupManagementFromClassManagement = groupManagementFromClassManagement,
+            adminManagementSelectedTab = adminManagementSelectedTab,
             onScreenChange = { currentScreen = it },
             onUserChange = { currentUser = it },
             onClassChange = { selectedClass = it },
             onGroupManagementFromClassManagementChange = { groupManagementFromClassManagement = it },
+            onAdminManagementSelectedTabChange = { adminManagementSelectedTab = it },
             onOpenDrawer = { scope.launch { drawerState.open() } }
         )
     }
@@ -278,10 +265,12 @@ fun AppScaffold(
     currentUser: User?,
     selectedClass: ClassEntity?,
     groupManagementFromClassManagement: Boolean,
+    adminManagementSelectedTab: Int,
     onScreenChange: (Screen) -> Unit,
     onUserChange: (User?) -> Unit,
     onClassChange: (ClassEntity?) -> Unit,
     onGroupManagementFromClassManagementChange: (Boolean) -> Unit,
+    onAdminManagementSelectedTabChange: (Int) -> Unit,
     onOpenDrawer: () -> Unit
 ) {
     when (currentScreen) {
@@ -325,7 +314,13 @@ fun AppScaffold(
                     onNavigateToClassManagement = { onScreenChange(Screen.ClassManagement) },
                     onNavigateToStudentQuery = { onScreenChange(Screen.StudentQuery) },
                     onNavigateToTeacherDashboard = { onScreenChange(Screen.TeacherDashboard) },
-                    onNavigateToGroupManagement = { onScreenChange(Screen.GroupClassList) },
+                    onNavigateToGroupManagement = {
+                        if (user.role.equals("Student", ignoreCase = true)) {
+                            onScreenChange(Screen.ClassManagement)
+                        } else {
+                            onScreenChange(Screen.GroupClassList)
+                        }
+                    },
                     onNavigateToResourceLibrary = { onScreenChange(Screen.ResourceClassList) },
                     onNavigateToLocationSharing = { onScreenChange(Screen.LocationSharing) },
                     onNavigateToAdminTeacherManagement = { onScreenChange(Screen.AdminTeacherManagement) },
@@ -401,6 +396,8 @@ fun AppScaffold(
                 AdminTeacherManagementScreen(
                     user = user,
                     onBackClick = onOpenDrawer,
+                    selectedTab = adminManagementSelectedTab,
+                    onTabChange = onAdminManagementSelectedTabChange,
                     onEditUser = { targetUser ->
                         onScreenChange(Screen.EditUserProfile(targetUser))
                     },
@@ -422,7 +419,8 @@ fun AppScaffold(
             currentUser?.let { user ->
                 StudentDashboardScreen(
                     user = user,
-                    onBackClick = onOpenDrawer
+                    onBackClick = onOpenDrawer,
+                    onAddQuestion = { onScreenChange(Screen.StudentQuery) }
                 )
             }
         }
@@ -430,7 +428,7 @@ fun AppScaffold(
             currentUser?.let { user ->
                 StudentQueryScreen(
                     user = user,
-                    onMenuClick = onOpenDrawer,
+                    onBackClick = { onScreenChange(Screen.StudentDashboard) },
                     onSubmitQuery = { teacherId, questionText, priority ->
                         val safeClassId = user.classId?.toIntOrNull() ?: 0
                         DatabaseHelper.createQuestion(
@@ -456,13 +454,8 @@ fun AppScaffold(
         }
         Screen.GroupManagement -> {
             currentUser?.let { user ->
-                // If an admin/teacher is managing groups, use the selectedClassId
-                // If a student is managing their group, use their own classId
-                val effectiveClassId = if (user.role.equals("Student", ignoreCase = true)) {
-                    user.classId?.toIntOrNull() ?: 1
-                } else {
-                    selectedClass?.classId ?: user.classId?.toIntOrNull() ?: 1
-                }
+                // Use the class selected in ClassManagementScreen if available
+                val effectiveClassId = selectedClass?.classId ?: user.classId?.toIntOrNull() ?: 1
 
                 GroupManagementScreen(
                     classId = effectiveClassId,

@@ -3,7 +3,6 @@ package com.example.mobsec_823.ui.screens
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.launch
@@ -56,8 +55,8 @@ fun RegisterScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
-    // Base64 encoded image string
-    var profileImageBase64 by remember { mutableStateOf<String?>(null) }
+    // Raw JPEG bytes for binary upload after registration
+    var newImageBytes by remember { mutableStateOf<ByteArray?>(null) }
     var profileBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     // Use allowedRoles if provided, otherwise show only Student and Parent
@@ -69,6 +68,7 @@ fun RegisterScreen(
     var generalErrorMessage by remember { mutableStateOf<String?>(null) }
     var isUsernameDuplicate by remember { mutableStateOf(false) }
     var isIdDuplicate by remember { mutableStateOf(false) }
+    var isIdNotFound by remember { mutableStateOf(false) }
 
     // Clear all fields and remove focus when the role tab changes
     LaunchedEffect(selectedSegment) {
@@ -78,11 +78,12 @@ fun RegisterScreen(
         idNumber = ""
         password = ""
         confirmPassword = ""
-        profileImageBase64 = null
+        newImageBytes = null
         profileBitmap = null
         generalErrorMessage = null
         isUsernameDuplicate = false
         isIdDuplicate = false
+        isIdNotFound = false
     }
 
     var showImageSourceDialog by remember { mutableStateOf(false) }
@@ -91,12 +92,11 @@ fun RegisterScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
-    // Helper to process bitmap to Base64
+    // Helper to process bitmap - compress to JPEG bytes
     fun processBitmap(bitmap: Bitmap) {
         val outputStream = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
-        val byteArray = outputStream.toByteArray()
-        profileImageBase64 = "data:image/jpeg;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP)
+        newImageBytes = outputStream.toByteArray()
         profileBitmap = bitmap
     }
 
@@ -235,7 +235,7 @@ fun RegisterScreen(
             }
         }
 
-        if (profileImageBase64 != null) {
+        if (newImageBytes != null) {
             Text(
                 text = "Image selected",
                 style = MaterialTheme.typography.bodySmall,
@@ -335,11 +335,12 @@ fun RegisterScreen(
             value = idNumber,
             onValueChange = {
                 idNumber = it
-                isIdDuplicate = false // Clear only ID error on typing
+                isIdDuplicate = false
+                isIdNotFound = false
             },
             label = { Text(idLabel) },
             modifier = Modifier.fillMaxWidth(),
-            isError = (idNumber.isNotEmpty() && !isIdNumberNumeric) || isIdDuplicate,
+            isError = (idNumber.isNotEmpty() && !isIdNumberNumeric) || isIdDuplicate || isIdNotFound,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
 
@@ -353,6 +354,13 @@ fun RegisterScreen(
         } else if (isIdDuplicate) {
             Text(
                 text = "An account has already exist under this number",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.align(Alignment.Start).padding(start = 16.dp, top = 4.dp)
+            )
+        } else if (isIdNotFound) {
+            Text(
+                text = "No student found with this student number",
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.align(Alignment.Start).padding(start = 16.dp, top = 4.dp)
@@ -397,6 +405,7 @@ fun RegisterScreen(
                 generalErrorMessage = null
                 isUsernameDuplicate = false
                 isIdDuplicate = false
+                isIdNotFound = false
 
                 scope.launch {
                     try {
@@ -408,23 +417,36 @@ fun RegisterScreen(
                             studentEmployeeNumber = idNumber,
                             passwordHash = hashedPassword,
                             role = role,
-                            fullName = fullName,
-                            profileImageUrl = profileImageBase64
+                            fullName = fullName
                         )
 
                         when (result) {
-                            is RegisterResult.Success -> onRegisterSuccess()
+                            is RegisterResult.Success -> {
+                                // If user selected a profile image, upload it now via binary endpoint
+                                if (newImageBytes != null) {
+                                    // We need the new user's ID. Look them up by username.
+                                    val allUsers = DatabaseHelper.getAllUsers()
+                                    val newUser = allUsers.find { it.username == username }
+                                    if (newUser != null) {
+                                        DatabaseHelper.uploadProfileImage(newUser.userId, newImageBytes!!)
+                                    }
+                                }
+                                onRegisterSuccess()
+                            }
                             is RegisterResult.Failure -> {
-                                val msg = result.message ?: ""
-                                val hasUsernameErr = msg.contains("Username already exists", ignoreCase = true)
-                                val hasIdErr = msg.contains("An account has already exist under this number", ignoreCase = true)
+                                val msg = result.message
+                                val lowerMsg = msg.lowercase()
+                                val hasUsernameErr = lowerMsg.contains("username") && (lowerMsg.contains("exist") || lowerMsg.contains("taken") || lowerMsg.contains("duplicate") || lowerMsg.contains("already"))
+                                val hasIdErr = lowerMsg.contains("number") && (lowerMsg.contains("exist") || lowerMsg.contains("taken") || lowerMsg.contains("duplicate") || lowerMsg.contains("already"))
+                                val hasIdNotFoundErr = lowerMsg.contains("no student found")
 
                                 // Explicitly update independent flags
                                 if (hasUsernameErr) isUsernameDuplicate = true
                                 if (hasIdErr) isIdDuplicate = true
+                                if (hasIdNotFoundErr) isIdNotFound = true
 
-                                // If the message doesn't match known duplicate errors, fallback to general message
-                                if (!hasUsernameErr && !hasIdErr) {
+                                // If the message doesn't match known field errors, fallback to general message
+                                if (!hasUsernameErr && !hasIdErr && !hasIdNotFoundErr) {
                                     generalErrorMessage = msg
                                 }
                             }

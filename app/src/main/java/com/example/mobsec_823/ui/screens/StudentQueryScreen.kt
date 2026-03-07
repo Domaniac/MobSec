@@ -2,7 +2,7 @@ package com.example.mobsec_823.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun StudentQueryScreen(
     user: User,
-    onMenuClick: () -> Unit,
+    onBackClick: () -> Unit,
     onSubmitQuery: suspend (teacherId: Int, question: String, priority: String) -> Boolean
 ) {
     var question by remember { mutableStateOf("") }
@@ -42,8 +42,8 @@ fun StudentQueryScreen(
             TopAppBar(
                 title = { Text("Ask a Question") },
                 navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu")
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -148,6 +148,8 @@ fun StudentQueryScreen(
                             if (success) {
                                 statusMessage = "Question sent successfully!"
                                 question = ""
+                                // Navigate back after success
+                                onBackClick()
                             } else {
                                 statusMessage = "Failed to send question."
                             }

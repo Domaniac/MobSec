@@ -21,6 +21,9 @@ data class User(
     @SerializedName("profile_image_url")
     val profileImageUrl: String? = null,
 
+    @SerializedName("profile_image")
+    val profileImage: String? = null,
+
     @SerializedName("created_at")
     val createdAt: String,
 

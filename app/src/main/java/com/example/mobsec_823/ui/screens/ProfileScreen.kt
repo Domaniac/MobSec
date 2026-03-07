@@ -3,7 +3,6 @@ package com.example.mobsec_823.ui.screens
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Base64
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.mobsec_823.data.DatabaseHelper
 import com.example.mobsec_823.data.User
+import com.example.mobsec_823.ui.loadProfileBitmap
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 
@@ -51,30 +51,21 @@ fun ProfileScreen(
     var isLoading by remember { mutableStateOf(false) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
 
-    // Base64 encoded image string
-    var profileImageBase64 by remember { mutableStateOf<String?>(user.profileImageUrl) }
+    // Track new image as raw JPEG bytes (for upload)
+    var newImageBytes by remember { mutableStateOf<ByteArray?>(null) }
     var profileBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
-    // Helper to process bitmap to Base64
+    // Helper to process bitmap — compress to JPEG bytes
     fun processBitmap(bitmap: Bitmap) {
         val outputStream = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
-        val byteArray = outputStream.toByteArray()
-        profileImageBase64 = "data:image/jpeg;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP)
+        newImageBytes = outputStream.toByteArray()
         profileBitmap = bitmap
     }
 
-    // Initial load of existing profile picture if it's base64
-    LaunchedEffect(user.profileImageUrl) {
-        if (user.profileImageUrl != null && user.profileImageUrl.startsWith("data:image")) {
-            try {
-                val base64String = user.profileImageUrl.substringAfter(",")
-                val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
-                profileBitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-            } catch (e: Exception) {
-                // Ignore errors
-            }
-        }
+    // Initial load of existing profile picture (handles both base64 data URI and HTTP URL)
+    LaunchedEffect(user.profileImage) {
+        profileBitmap = loadProfileBitmap(user.profileImage)
     }
 
     // Camera Launcher
@@ -150,16 +141,31 @@ fun ProfileScreen(
                 },
                 actions = {
                     // Save button if changes were made
-                    val hasChanges = username != user.username || profileImageBase64 != user.profileImageUrl
+                    val hasUsernameChange = username != user.username
+                    val hasImageChange = newImageBytes != null
+                    val hasChanges = hasUsernameChange || hasImageChange
                     if (hasChanges && !isLoading) {
                         TextButton(onClick = {
                             isLoading = true
                             scope.launch {
-                                val success = DatabaseHelper.updateUserProfile(
-                                    userId = user.userId,
-                                    username = if (username != user.username) username else null,
-                                    profileImageUrl = if (profileImageBase64 != user.profileImageUrl) profileImageBase64 else null
-                                )
+                                var success = true
+
+                                // 1. Upload image if changed (separate binary endpoint)
+                                if (hasImageChange && newImageBytes != null) {
+                                    val uploadSuccess = DatabaseHelper.uploadProfileImage(user.userId, newImageBytes!!)
+                                    if (!uploadSuccess) {
+                                        success = false
+                                    }
+                                }
+
+                                // 2. Update username if changed
+                                if (success && hasUsernameChange) {
+                                    success = DatabaseHelper.updateUserProfile(
+                                        userId = user.userId,
+                                        username = username
+                                    )
+                                }
+
                                 if (success) {
                                     Toast.makeText(context, "Profile updated successfully", Toast.LENGTH_SHORT).show()
                                     // Refresh local user data
@@ -167,6 +173,7 @@ fun ProfileScreen(
                                     if (updatedUser != null) {
                                         onProfileUpdated(updatedUser)
                                     }
+                                    newImageBytes = null // Reset change tracker
                                 } else {
                                     Toast.makeText(context, "Failed to update profile", Toast.LENGTH_SHORT).show()
                                 }
@@ -185,13 +192,13 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(24.dp),
+                .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Profile Picture with Pencil Icon Overlay
             Box(
                 modifier = Modifier
-                    .size(100.dp)
+                    .size(150.dp)
                     .clickable { showImageSourceDialog = true },
                 contentAlignment = Alignment.BottomEnd
             ) {
@@ -213,7 +220,7 @@ fun ProfileScreen(
                         Icon(
                             imageVector = Icons.Default.Person,
                             contentDescription = "Profile Picture",
-                            modifier = Modifier.size(60.dp),
+                            modifier = Modifier.size(85.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -224,27 +231,28 @@ fun ProfileScreen(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primary,
                     tonalElevation = 4.dp,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(42.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Edit Profile Picture",
-                        modifier = Modifier.padding(6.dp),
+                        modifier = Modifier.padding(9.dp),
                         tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // Username with Edit Icon
             if (isEditingUsername) {
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Username") },
+                    label = { Text("Username", style = MaterialTheme.typography.titleMedium) },
+                    textStyle = MaterialTheme.typography.headlineSmall,
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(0.8f)
+                    modifier = Modifier.fillMaxWidth(0.9f)
                 )
             } else {
                 Row(
@@ -253,29 +261,34 @@ fun ProfileScreen(
                 ) {
                     Text(
                         text = "@$username",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.secondary
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Edit Username",
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(26.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(36.dp))
 
             // User details card (Immutable)
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     UserInfoRow("Full Name", user.fullName ?: "N/A")
+                    HorizontalDivider()
                     UserInfoRow("Role", user.role)
+                    HorizontalDivider()
                     UserInfoRow("Account Created", user.createdAt ?: "N/A")
                 }
             }
@@ -283,8 +296,8 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             if (isLoading) {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(16.dp))
+                CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
     }
@@ -295,19 +308,20 @@ private fun UserInfoRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.width(140.dp)
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1.5f)
         )
     }
 }

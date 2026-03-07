@@ -1,7 +1,5 @@
 package com.example.mobsec_823.ui.screens
 
-import android.graphics.BitmapFactory
-import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,9 +18,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.mobsec_823.data.DatabaseHelper
 import com.example.mobsec_823.data.User
+import com.example.mobsec_823.ui.rememberProfileBitmap
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,14 +29,18 @@ fun AdminTeacherManagementScreen(
     user: User,
     onBackClick: () -> Unit,
     onEditUser: (User) -> Unit = {},
-    onRegisterNew: () -> Unit = {}
+    onRegisterNew: () -> Unit = {},
+    selectedTab: Int = 0,
+    onTabChange: (Int) -> Unit = {}
 ) {
     var allUsers by remember { mutableStateOf<List<User>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableIntStateOf(0) }
     var searchKeyword by remember { mutableStateOf("") }
-    val tabs = listOf("Teachers", "Admins")
+    var userToDelete by remember { mutableStateOf<User?>(null) }
+    
+    val tabs = listOf("Students", "Parents", "Teachers", "Admins")
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val refreshUsers = {
         scope.launch {
@@ -52,10 +54,51 @@ fun AdminTeacherManagementScreen(
         refreshUsers()
     }
 
+    // Delete Confirmation Dialog
+    if (userToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { userToDelete = null },
+            title = { Text("Delete User") },
+            text = { 
+                Text("Are you sure you want to delete ${userToDelete?.fullName ?: userToDelete?.username}? " +
+                     "This will permanently remove their account and all associated data " +
+                     "(e.g., resources uploaded, forum posts, etc.).") 
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val target = userToDelete
+                        userToDelete = null
+                        if (target != null) {
+                            scope.launch {
+                                val success = DatabaseHelper.deleteUser(target.userId)
+                                if (success) {
+                                    snackbarHostState.showSnackbar("User deleted successfully")
+                                    allUsers = allUsers.filter { it.userId != target.userId }
+                                } else {
+                                    snackbarHostState.showSnackbar("Failed to delete user")
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { userToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Admin & Teacher Management") },
+                title = { Text("User Management") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu")
@@ -86,7 +129,10 @@ fun AdminTeacherManagementScreen(
                 tabs.forEachIndexed { index, title ->
                     Tab(
                         selected = selectedTab == index,
-                        onClick = { selectedTab = index; searchKeyword = "" },
+                        onClick = { 
+                            onTabChange(index)
+                            searchKeyword = "" 
+                        },
                         text = { Text(title) }
                     )
                 }
@@ -104,7 +150,13 @@ fun AdminTeacherManagementScreen(
                 singleLine = true
             )
 
-            val selectedRole = if (selectedTab == 0) "Teacher" else "Admin"
+            val selectedRole = when (selectedTab) {
+                0 -> "Student"
+                1 -> "Parent"
+                2 -> "Teacher"
+                3 -> "Admin"
+                else -> "Student"
+            }
             val filtered = allUsers.filter { u ->
                 u.role.equals(selectedRole, ignoreCase = true) &&
                         ((u.fullName ?: u.username).contains(searchKeyword, ignoreCase = true) ||
@@ -134,7 +186,13 @@ fun AdminTeacherManagementScreen(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            imageVector = if (selectedTab == 0) Icons.Default.School else Icons.Default.AdminPanelSettings,
+                            imageVector = when (selectedTab) {
+                                0 -> Icons.Default.Person
+                                1 -> Icons.Default.People
+                                2 -> Icons.Default.School
+                                3 -> Icons.Default.AdminPanelSettings
+                                else -> Icons.Default.Person
+                            },
                             contentDescription = null,
                             modifier = Modifier.size(64.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
@@ -156,7 +214,15 @@ fun AdminTeacherManagementScreen(
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     items(filtered, key = { it.userId }) { item ->
-                        AdminTeacherUserCard(user = item, onClick = { onEditUser(item) })
+                        AdminTeacherUserCard(
+                            user = item, 
+                            onClick = { onEditUser(item) },
+                            onDeleteClick = { 
+                                if (item.userId != user.userId) {
+                                    userToDelete = item 
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -165,7 +231,11 @@ fun AdminTeacherManagementScreen(
 }
 
 @Composable
-private fun AdminTeacherUserCard(user: User, onClick: () -> Unit) {
+private fun AdminTeacherUserCard(
+    user: User, 
+    onClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -179,19 +249,7 @@ private fun AdminTeacherUserCard(user: User, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Profile image
-            val profileBitmap = remember(user.profileImageUrl) {
-                if (user.profileImageUrl != null && user.profileImageUrl.startsWith("data:image")) {
-                    try {
-                        val base64String = user.profileImageUrl.substringAfter(",")
-                        val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
-                        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                    } catch (e: Exception) {
-                        null
-                    }
-                } else {
-                    null
-                }
-            }
+            val profileBitmap = rememberProfileBitmap(user.profileImage)
 
             Box(
                 modifier = Modifier
@@ -246,6 +304,14 @@ private fun AdminTeacherUserCard(user: User, onClick: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+
+            IconButton(onClick = onDeleteClick) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete User",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
 
             Icon(
