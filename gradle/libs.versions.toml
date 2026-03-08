@@ -1,5 +1,5 @@
 [versions]
-agp = "8.8.0"
+agp = "8.13.2"
 kotlin = "2.0.0"
 coreKtx = "1.15.0"
 junit = "4.13.2"
@@ -15,6 +15,7 @@ navigation = "2.7.6"
 mysqlConnector = "8.0.33"
 gson = "2.10.1"
 scenecore = "1.0.0-alpha11"
+workRuntimeKtx = "2.11.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -41,6 +42,7 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 mysql-connector = { group = "mysql", name = "mysql-connector-java", version.ref = "mysqlConnector" }
 androidx-scenecore = { group = "androidx.xr.scenecore", name = "scenecore", version.ref = "scenecore" }
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntimeKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

