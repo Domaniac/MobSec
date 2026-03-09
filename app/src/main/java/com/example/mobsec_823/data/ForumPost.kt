@@ -28,5 +28,8 @@ data class ForumPost(
     val username: String,
 
     @SerializedName("full_name")
-    val fullName: String?
+    val fullName: String?,
+
+    @SerializedName("profile_image")
+    val profileImage: String? = null
 )

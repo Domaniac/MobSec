@@ -446,7 +446,7 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         // Profile Icon
-                                        val profileBitmap = rememberProfileBitmap(item.profileImageUrl)
+                                        val profileBitmap = rememberProfileBitmap(item.profileImage)
 
                                         Box(
                                             modifier = Modifier
@@ -547,7 +547,7 @@ fun ViewUserProfileDialog(user: User, onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                val profileBitmap = rememberProfileBitmap(user.profileImageUrl)
+                val profileBitmap = rememberProfileBitmap(user.profileImage)
 
                 Box(
                     modifier = Modifier

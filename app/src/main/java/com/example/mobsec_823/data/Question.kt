@@ -32,5 +32,8 @@ data class Question(
     val answer: String? = null,
 
     @SerializedName("student_full_name")
-    val studentName: String?
+    val studentName: String?,
+
+    @SerializedName("teacher_full_name")
+    val teacherName: String?
 )

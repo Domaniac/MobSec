@@ -22,5 +22,8 @@ data class Comment(
     val username: String,
 
     @SerializedName("full_name")
-    val fullName: String?
+    val fullName: String?,
+
+    @SerializedName("profile_image")
+    val profileImage: String? // Add this line
 )

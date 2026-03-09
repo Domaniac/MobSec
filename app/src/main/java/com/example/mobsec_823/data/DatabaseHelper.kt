@@ -303,6 +303,24 @@ object DatabaseHelper {
         return if (response?.success == true) response.questions ?: emptyList() else emptyList()
     }
 
+    suspend fun updateQuestion(questionId: Int, studentId: Int, question: String, priority: String): Boolean {
+        val body = gson.toJson(mapOf(
+            "student_id" to studentId,
+            "question" to question,
+            "priority" to priority
+        ))
+        val json = SimpleApi.put("/api/questions/$questionId", body) ?: return false
+        val response = safeParse(json, SimpleResponse::class.java)
+        return response?.success == true
+    }
+
+    suspend fun deleteQuestion(questionId: Int, studentId: Int): Boolean {
+        val body = gson.toJson(mapOf("student_id" to studentId))
+        val json = SimpleApi.deleteWithBody("/api/questions/$questionId", body) ?: return false
+        val response = safeParse(json, SimpleResponse::class.java)
+        return response?.success == true
+    }
+
     // ========== Group Entity ========
     suspend fun getUserGroup(classId: Int, userId: Int): GroupEntity? {
         val json = SimpleApi.get("/api/classes/$classId/users/$userId/group") ?: return null
