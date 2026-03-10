@@ -32,7 +32,7 @@ object SimpleApi {
     private const val TAG = "SimpleApi"
 
     private const val TIMEOUT_MS = 15000
-    private const val MAX_RETRIES = 10
+    private const val MAX_RETRIES = 2
     private const val RETRY_DELAY_MS = 1000L
 
     // OkHttp client used only for multipart uploads (postMultipart, putMultipartImageBytes, getBytes)
