@@ -10,10 +10,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,7 +43,12 @@ fun LocationSharingScreen(userId: Int, onBackClick: () -> Unit) {
         val intent = Intent(Intent.ACTION_VIEW, uri).apply {
             setPackage("com.google.android.apps.maps")
         }
-        context.startActivity(intent)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            val mapIntent = Intent(Intent.ACTION_VIEW, uri)
+            context.startActivity(mapIntent)
+        }
     }
 
     // Permission Launcher
@@ -90,8 +95,13 @@ fun LocationSharingScreen(userId: Int, onBackClick: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding()) {
         // Header
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = onBackClick) { Text("Back") }
-            Spacer(modifier = Modifier.width(16.dp))
+            IconButton(onClick = onBackClick) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back"
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             Text("Location Sharing", fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
 
@@ -118,7 +128,9 @@ fun LocationSharingScreen(userId: Int, onBackClick: () -> Unit) {
         Text("Tap a user to see them on Google Maps", fontSize = 12.sp, color = Color.Gray)
 
         if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
                 items(locations) { loc ->

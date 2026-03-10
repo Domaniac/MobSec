@@ -36,8 +36,9 @@ fun ClassListScreen(
             isLoading = true
             errorMessage = null
             try {
-                // For Teacher/Admin, show all classes
-                if (user.role.equals("Teacher", ignoreCase = true) || user.role.equals("Admin", ignoreCase = true)) {
+                // Ensure only assigned classes are displayed for Students, Parents, and Teachers.
+                // Only Admin is able to view all classes in the system.
+                if (user.role.equals("Admin", ignoreCase = true)) {
                     classes = DatabaseHelper.getAllClasses()
                 } else {
                     classes = DatabaseHelper.getUserClasses(user.userId)
@@ -139,6 +140,11 @@ fun ClassListScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "You are not assigned to any classes yet.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
                 }

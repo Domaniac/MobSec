@@ -147,9 +147,10 @@ fun MobSecApp() {
                             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                         )
 
-                        if (user.role.equals("Student", ignoreCase = true)) {
+                        // Student & Parent specific navigation items
+                        if (user.role.equals("Student", ignoreCase = true) || user.role.equals("Parent", ignoreCase = true)) {
                             NavigationDrawerItem(
-                                label = { Text("My Question History") },
+                                label = { Text(if (user.role.equals("Student", ignoreCase = true)) "My Question History" else "Question History") },
                                 selected = currentScreen == Screen.StudentDashboard,
                                 onClick = { navigateTo(Screen.StudentDashboard) },
                                 icon = { Icon(Icons.Default.History, contentDescription = null) },
@@ -200,14 +201,16 @@ fun MobSecApp() {
                             )
                         }
 
-                        // Share & View Locations is always the last functional navigation item
-                        NavigationDrawerItem(
-                            label = { Text("Share & View Locations") },
-                            selected = currentScreen == Screen.LocationSharing,
-                            onClick = { navigateTo(Screen.LocationSharing) },
-                            icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                        )
+                        // Share & View Locations is only available for non-Parent roles
+                        if (!user.role.equals("Parent", ignoreCase = true)) {
+                            NavigationDrawerItem(
+                                label = { Text("Share & View Locations") },
+                                selected = currentScreen == Screen.LocationSharing,
+                                onClick = { navigateTo(Screen.LocationSharing) },
+                                icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        }
 
                         Spacer(modifier = Modifier.weight(1f))
                         NavigationDrawerItem(
@@ -313,7 +316,7 @@ fun AppScaffold(
                     onNavigateToStudentQuery = { onScreenChange(Screen.StudentQuery) },
                     onNavigateToTeacherDashboard = { onScreenChange(Screen.TeacherDashboard) },
                     onNavigateToGroupManagement = {
-                        if (user.role.equals("Student", ignoreCase = true)) {
+                        if (user.role.equals("Student", ignoreCase = true) || user.role.equals("Parent", ignoreCase = true)) {
                             onScreenChange(Screen.ClassManagement)
                         } else {
                             onScreenChange(Screen.GroupClassList)

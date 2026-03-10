@@ -427,7 +427,7 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
                     if (filtered.isEmpty()) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
-                                if (isAdmin) "No ${selectedRole.lowercase()}s found."
+                                if (isAdmin) "No one found."
                                 else "No ${selectedRole.lowercase()}s found in this class.",
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )

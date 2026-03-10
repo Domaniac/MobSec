@@ -256,12 +256,6 @@ fun CreatePostDialog(
                     label = { Text("Content *") },
                     modifier = Modifier.fillMaxWidth().height(150.dp), enabled = !isCreating
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = imageUrl, onValueChange = { imageUrl = it },
-                    label = { Text("Image URL (optional)") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = !isCreating
-                )
             }
         },
         confirmButton = {
@@ -478,7 +472,6 @@ fun EditPostDialog(post: ForumPost, onDismiss: () -> Unit, onUpdatePost: (title:
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(value = content, onValueChange = { content = it }, label = { Text("Content *") }, modifier = Modifier.fillMaxWidth().height(150.dp), enabled = !isUpdating)
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(value = imageUrl, onValueChange = { imageUrl = it }, label = { Text("Image URL (optional)") }, modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = !isUpdating)
             }
         },
         confirmButton = {
