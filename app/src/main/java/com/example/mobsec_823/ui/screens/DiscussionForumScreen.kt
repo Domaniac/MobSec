@@ -32,6 +32,7 @@ import com.example.mobsec_823.data.Comment
 import com.example.mobsec_823.data.DatabaseHelper
 import com.example.mobsec_823.data.ForumPost
 import com.example.mobsec_823.data.User
+import com.example.mobsec_823.ui.ViewUserProfileDialog
 import com.example.mobsec_823.ui.rememberProfileBitmap
 import kotlinx.coroutines.launch
 
@@ -47,6 +48,10 @@ fun DiscussionForumScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showCreatePostDialog by remember { mutableStateOf(false) }
+    
+    var viewingUser by remember { mutableStateOf<User?>(null) }
+    var isFetchingProfile by remember { mutableStateOf(false) }
+    
     val scope = rememberCoroutineScope()
 
     // Function to refresh posts
@@ -68,6 +73,17 @@ fun DiscussionForumScreen(
     // Load posts for this class
     LaunchedEffect(classId) {
         refreshPosts()
+    }
+
+    val onProfileClick: (Int) -> Unit = { userId ->
+        scope.launch {
+            isFetchingProfile = true
+            val fetchedUser = DatabaseHelper.getUserById(userId)
+            if (fetchedUser != null) {
+                viewingUser = fetchedUser
+            }
+            isFetchingProfile = false
+        }
     }
 
     Scaffold(
@@ -93,14 +109,16 @@ fun DiscussionForumScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showCreatePostDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Create Post"
-                )
+            if (!isLoading) {
+                FloatingActionButton(
+                    onClick = { showCreatePostDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Create Post"
+                    )
+                }
             }
         }
     ) { paddingValues ->
@@ -170,7 +188,8 @@ fun DiscussionForumScreen(
                             post = post,
                             currentUser = user,
                             onPostUpdated = { refreshPosts() },
-                            onPostDeleted = { refreshPosts() }
+                            onPostDeleted = { refreshPosts() },
+                            onProfileClick = onProfileClick
                         )
                     }
                 }
@@ -188,6 +207,22 @@ fun DiscussionForumScreen(
                         refreshPosts()
                     }
                     showCreatePostDialog = false
+                }
+            }
+        )
+    }
+
+    if (viewingUser != null) {
+        ViewUserProfileDialog(user = viewingUser!!, onDismiss = { viewingUser = null })
+    }
+
+    if (isFetchingProfile) {
+        AlertDialog(
+            onDismissRequest = { isFetchingProfile = false },
+            confirmButton = {},
+            text = {
+                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
             }
         )
@@ -249,7 +284,8 @@ fun ForumPostCard(
     post: ForumPost,
     currentUser: User,
     onPostUpdated: () -> Unit,
-    onPostDeleted: () -> Unit
+    onPostDeleted: () -> Unit,
+    onProfileClick: (Int) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     var comments by remember { mutableStateOf<List<Comment>>(emptyList()) }
@@ -292,7 +328,8 @@ fun ForumPostCard(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { onProfileClick(post.userId) },
                         contentAlignment = Alignment.Center
                     ) {
                         if (profileBitmap != null) {
@@ -314,7 +351,12 @@ fun ForumPostCard(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(text = post.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                        Text(text = "by ${post.fullName ?: post.username} • ${post.createdAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = "by ${post.fullName ?: post.username} • ${post.createdAt}", 
+                            style = MaterialTheme.typography.bodySmall, 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.clickable { onProfileClick(post.userId) }
+                        )
                     }
                 }
                 if (canEdit || canDelete) {
@@ -374,7 +416,13 @@ fun ForumPostCard(
                 if (!isLoadingComments && comments.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
                         comments.forEach { comment ->
-                            CommentItem(comment = comment, currentUser = currentUser, onCommentUpdated = { refreshComments() }, onCommentDeleted = { refreshComments() })
+                            CommentItem(
+                                comment = comment, 
+                                currentUser = currentUser, 
+                                onCommentUpdated = { refreshComments() }, 
+                                onCommentDeleted = { refreshComments() },
+                                onProfileClick = onProfileClick
+                            )
                         }
                     }
                 }
@@ -496,7 +544,13 @@ fun AddCommentSection(postId: Int, userId: Int, onCommentAdded: () -> Unit) {
 }
 
 @Composable
-fun CommentItem(comment: Comment, currentUser: User, onCommentUpdated: () -> Unit, onCommentDeleted: () -> Unit) {
+fun CommentItem(
+    comment: Comment, 
+    currentUser: User, 
+    onCommentUpdated: () -> Unit, 
+    onCommentDeleted: () -> Unit,
+    onProfileClick: (Int) -> Unit
+) {
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -517,7 +571,8 @@ fun CommentItem(comment: Comment, currentUser: User, onCommentUpdated: () -> Uni
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { onProfileClick(comment.userId) },
                         contentAlignment = Alignment.Center
                     ) {
                         if (profileBitmap != null) {
@@ -540,7 +595,8 @@ fun CommentItem(comment: Comment, currentUser: User, onCommentUpdated: () -> Uni
                     Text(
                         text = "${comment.fullName ?: comment.username} • ${comment.createdAt}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clickable { onProfileClick(comment.userId) }
                     )
                 }
                 if (canEdit || canDelete) {

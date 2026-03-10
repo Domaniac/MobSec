@@ -2,7 +2,6 @@ package com.example.mobsec_823.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -185,6 +184,7 @@ private fun AdminTeacherGroupManagement(
     showBackButton: Boolean
 ) {
     var groups by remember { mutableStateOf<List<GroupEntity>>(emptyList()) }
+    var allClassUsers by remember { mutableStateOf<List<User>>(emptyList()) }
     var unassignedUsers by remember { mutableStateOf<List<User>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -197,19 +197,20 @@ private fun AdminTeacherGroupManagement(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var groupToDelete by remember { mutableStateOf<GroupEntity?>(null) }
 
-    // Add member dialog
-    var showAddMemberDialog by remember { mutableStateOf(false) }
+    // Manage members dialog
+    var showManageMembersDialog by remember { mutableStateOf(false) }
     var targetGroup by remember { mutableStateOf<GroupEntity?>(null) }
 
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val tabs = listOf("Groups", "Unassigned Users")
+    val tabs = listOf("Groups", "Unassigned Students")
 
     val refresh: () -> Unit = {
         scope.launch {
             isLoading = true
             groups = DatabaseHelper.getClassGroups(classId)
+            allClassUsers = DatabaseHelper.getClassUsers(classId)
             unassignedUsers = DatabaseHelper.getUnassignedStudents(classId)
             isLoading = false
         }
@@ -217,6 +218,13 @@ private fun AdminTeacherGroupManagement(
 
     LaunchedEffect(classId) {
         refresh()
+    }
+
+    // Sync targetGroup when groups list updates
+    LaunchedEffect(groups) {
+        if (targetGroup != null) {
+            targetGroup = groups.find { it.group_id == targetGroup!!.group_id }
+        }
     }
 
     Scaffold(
@@ -273,20 +281,9 @@ private fun AdminTeacherGroupManagement(
                 when (selectedTab) {
                     0 -> GroupsTab(
                         groups = groups,
-                        onAddMember = { group ->
+                        onManageMembers = { group ->
                             targetGroup = group
-                            showAddMemberDialog = true
-                        },
-                        onRemoveMember = { group, member ->
-                            scope.launch {
-                                val success = DatabaseHelper.removeUserFromGroup(classId, group.group_id, member.userId)
-                                if (success) {
-                                    snackbarHostState.showSnackbar("${member.fullName ?: member.username} removed from ${group.group_name}")
-                                    refresh()
-                                } else {
-                                    snackbarHostState.showSnackbar("Failed to remove member")
-                                }
-                            }
+                            showManageMembersDialog = true
                         },
                         onDeleteGroup = { group ->
                             groupToDelete = group
@@ -391,28 +388,17 @@ private fun AdminTeacherGroupManagement(
         )
     }
 
-    // ===== Add Member Dialog =====
-    if (showAddMemberDialog && targetGroup != null) {
-        AddMemberDialog(
+    // ===== Manage Members Dialog (with Toggle Switches) =====
+    if (showManageMembersDialog && targetGroup != null) {
+        ManageMembersDialog(
+            classId = classId,
             group = targetGroup!!,
-            unassignedUsers = unassignedUsers,
+            allClassUsers = allClassUsers,
             onDismiss = {
-                showAddMemberDialog = false
+                showManageMembersDialog = false
                 targetGroup = null
             },
-            onAddMember = { selectedUser ->
-                scope.launch {
-                    val success = DatabaseHelper.addUserToGroup(classId, targetGroup!!.group_id, selectedUser.userId)
-                    if (success) {
-                        snackbarHostState.showSnackbar("${selectedUser.fullName ?: selectedUser.username} added to ${targetGroup!!.group_name}")
-                        refresh()
-                    } else {
-                        snackbarHostState.showSnackbar("Failed to add member")
-                    }
-                    showAddMemberDialog = false
-                    targetGroup = null
-                }
-            }
+            onRefresh = refresh
         )
     }
 }
@@ -422,8 +408,7 @@ private fun AdminTeacherGroupManagement(
 @Composable
 private fun GroupsTab(
     groups: List<GroupEntity>,
-    onAddMember: (GroupEntity) -> Unit,
-    onRemoveMember: (GroupEntity, User) -> Unit,
+    onManageMembers: (GroupEntity) -> Unit,
     onDeleteGroup: (GroupEntity) -> Unit
 ) {
     if (groups.isEmpty()) {
@@ -458,8 +443,7 @@ private fun GroupsTab(
             items(groups, key = { it.group_id }) { group ->
                 GroupCard(
                     group = group,
-                    onAddMember = { onAddMember(group) },
-                    onRemoveMember = { member -> onRemoveMember(group, member) },
+                    onManageMembers = { onManageMembers(group) },
                     onDeleteGroup = { onDeleteGroup(group) }
                 )
             }
@@ -472,8 +456,7 @@ private fun GroupsTab(
 @Composable
 private fun GroupCard(
     group: GroupEntity,
-    onAddMember: () -> Unit,
-    onRemoveMember: (User) -> Unit,
+    onManageMembers: () -> Unit,
     onDeleteGroup: () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -484,7 +467,7 @@ private fun GroupCard(
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Group header row — always visible
+            // Group header row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -512,16 +495,16 @@ private fun GroupCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "$memberCount member${if (memberCount != 1) "s" else ""}",
+                        text = "$memberCount student${if (memberCount != 1) "s" else ""}",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onAddMember) {
+                    IconButton(onClick = onManageMembers) {
                         Icon(
                             imageVector = Icons.Default.PersonAdd,
-                            contentDescription = "Add Member",
+                            contentDescription = "Manage Members",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -550,13 +533,13 @@ private fun GroupCard(
                 )
             }
 
-            // Members list — only shown when expanded
+            // Members list
             if (isExpanded) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                 if (group.members.isNullOrEmpty()) {
                     Text(
-                        "No members yet. Tap + to add members.",
+                        "No students assigned yet. Tap + to manage members.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.Gray,
                         modifier = Modifier.padding(vertical = 4.dp)
@@ -608,13 +591,6 @@ private fun GroupCard(
                                     )
                                 }
                             }
-                            IconButton(onClick = { onRemoveMember(member) }) {
-                                Icon(
-                                    imageVector = Icons.Default.RemoveCircleOutline,
-                                    contentDescription = "Remove ${member.username}",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
                         }
                     }
                 }
@@ -627,7 +603,10 @@ private fun GroupCard(
 
 @Composable
 private fun UnassignedUsersTab(unassignedUsers: List<User>) {
-    if (unassignedUsers.isEmpty()) {
+    // Only show students in this tab
+    val unassignedStudents = unassignedUsers.filter { it.role.equals("Student", ignoreCase = true) }
+
+    if (unassignedStudents.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
@@ -638,7 +617,7 @@ private fun UnassignedUsersTab(unassignedUsers: List<User>) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "All users are assigned to a group!",
+                    "All students are assigned to a group!",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -653,13 +632,13 @@ private fun UnassignedUsersTab(unassignedUsers: List<User>) {
         ) {
             item {
                 Text(
-                    "${unassignedUsers.size} user${if (unassignedUsers.size != 1) "s" else ""} not assigned to any group",
+                    "${unassignedStudents.size} student${if (unassignedStudents.size != 1) "s" else ""} not assigned to any group",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
-            items(unassignedUsers, key = { it.userId }) { userItem ->
+            items(unassignedStudents, key = { it.userId }) { userItem ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     elevation = CardDefaults.cardElevation(1.dp)
@@ -713,113 +692,128 @@ private fun UnassignedUsersTab(unassignedUsers: List<User>) {
     }
 }
 
-// ==================== Add Member Dialog ====================
+// ==================== Manage Members Dialog (with Toggle Switches) ====================
 
 @Composable
-private fun AddMemberDialog(
+private fun ManageMembersDialog(
+    classId: Int,
     group: GroupEntity,
-    unassignedUsers: List<User>,
+    allClassUsers: List<User>,
     onDismiss: () -> Unit,
-    onAddMember: (User) -> Unit
+    onRefresh: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var updatingUserId by remember { mutableStateOf<Int?>(null) }
+    val scope = rememberCoroutineScope()
 
-    val filteredUsers = unassignedUsers.filter { u ->
-        (u.fullName ?: u.username).contains(searchQuery, ignoreCase = true) ||
-                u.username.contains(searchQuery, ignoreCase = true)
+    // Filter to only show Students in the management dialog
+    val filteredStudents = allClassUsers.filter { u ->
+        u.role.equals("Student", ignoreCase = true) && (
+            (u.fullName ?: u.username).contains(searchQuery, ignoreCase = true) ||
+            u.username.contains(searchQuery, ignoreCase = true)
+        )
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Member to ${group.group_name}") },
+        title = { Text("Manage Students: ${group.group_name}") },
         text = {
             Column {
-                if (unassignedUsers.isEmpty()) {
-                    Text(
-                        "No unassigned users available to add.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text("Search users...") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Default.Search, null) }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyColumn(
-                        modifier = Modifier.heightIn(max = 300.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        items(filteredUsers, key = { it.userId }) { userItem ->
-                            Card(
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search students...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = { Icon(Icons.Default.Search, null) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(filteredStudents, key = { it.userId }) { userItem ->
+                        val isInThisGroup = group.members?.any { it.userId == userItem.userId } ?: false
+                        val isUpdating = updatingUserId == userItem.userId
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(1.dp)
+                        ) {
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onAddMember(userItem) },
-                                elevation = CardDefaults.cardElevation(1.dp)
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
+                                val profileBitmap = rememberProfileBitmap(userItem.profileImage)
+                                Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    val profileBitmap = rememberProfileBitmap(userItem.profileImage)
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (profileBitmap != null) {
-                                            Image(
-                                                bitmap = profileBitmap.asImageBitmap(),
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
-                                            Icon(
-                                                imageVector = Icons.Default.Person,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(20.dp),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = userItem.fullName ?: userItem.username,
-                                            fontWeight = FontWeight.Medium
+                                    if (profileBitmap != null) {
+                                        Image(
+                                            bitmap = profileBitmap.asImageBitmap(),
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
                                         )
-                                        Text(
-                                            text = "@${userItem.username} • ${userItem.role}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = Color.Gray
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
-                            }
-                        }
-                        if (filteredUsers.isEmpty() && searchQuery.isNotEmpty()) {
-                            item {
-                                Text(
-                                    "No users found matching \"$searchQuery\"",
-                                    modifier = Modifier.padding(8.dp),
-                                    color = Color.Gray
-                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = userItem.fullName ?: userItem.username,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "@${userItem.username}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.Gray
+                                    )
+                                }
+
+                                if (isUpdating) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Switch(
+                                        checked = isInThisGroup,
+                                        onCheckedChange = { shouldAdd ->
+                                            scope.launch {
+                                                updatingUserId = userItem.userId
+                                                val success = if (shouldAdd) {
+                                                    DatabaseHelper.addUserToGroup(classId, group.group_id, userItem.userId)
+                                                } else {
+                                                    DatabaseHelper.removeUserFromGroup(classId, group.group_id, userItem.userId)
+                                                }
+                                                if (success) {
+                                                    onRefresh()
+                                                }
+                                                updatingUserId = null
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         },
-        confirmButton = {},
-        dismissButton = {
+        confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text("Close")
             }

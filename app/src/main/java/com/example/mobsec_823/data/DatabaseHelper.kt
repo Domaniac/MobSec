@@ -239,6 +239,7 @@ object DatabaseHelper {
             "user_id" to userId,
             "content" to content
         ))
+        // Updated URL to include the postId in the path to match the new backend route
         val json = SimpleApi.post("/api/posts/$postId/comments", body) ?: return null
         val response = safeParse(json, CommentResponse::class.java)
         return if (response?.success == true) response.comment else null

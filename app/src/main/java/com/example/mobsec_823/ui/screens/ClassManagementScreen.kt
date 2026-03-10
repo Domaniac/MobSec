@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mobsec_823.data.ClassEntity
 import com.example.mobsec_823.data.DatabaseHelper
+import com.example.mobsec_823.data.GroupEntity
 import com.example.mobsec_823.data.User
 import com.example.mobsec_823.ui.rememberProfileBitmap
 import kotlinx.coroutines.launch
@@ -175,7 +176,10 @@ fun ManageClassesTab(
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showManageUsersDialog by remember { mutableStateOf(false) }
+    var showStudentGroupDialog by remember { mutableStateOf(false) }
+    
     val isAdmin = user.role.equals("Admin", ignoreCase = true)
+    val isStudent = user.role.equals("Student", ignoreCase = true)
     val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -194,7 +198,14 @@ fun ManageClassesTab(
                         onEdit = { selectedClass = classEntity; showEditDialog = true },
                         onDelete = { selectedClass = classEntity; showDeleteDialog = true },
                         onManageUsers = { selectedClass = classEntity; showManageUsersDialog = true },
-                        onManageGroups = { onManageGroups(classEntity) }
+                        onManageGroups = {
+                            if (isStudent) {
+                                selectedClass = classEntity
+                                showStudentGroupDialog = true
+                            } else {
+                                onManageGroups(classEntity)
+                            }
+                        }
                     )
                 }
             }
@@ -223,6 +234,7 @@ fun ManageClassesTab(
         )
     }
     if (showManageUsersDialog && selectedClass != null) ManageClassUsersDialog(user, selectedClass!!, onDismiss = { showManageUsersDialog = false })
+    if (showStudentGroupDialog && selectedClass != null) StudentGroupDialog(user, selectedClass!!, onDismiss = { showStudentGroupDialog = false })
 }
 
 @Composable
@@ -534,6 +546,137 @@ fun ManageClassUsersDialog(user: User, classEntity: ClassEntity, onDismiss: () -
             }
         },
         confirmButton = { Button(onClick = onDismiss, enabled = !isUpdating) { Text("Close") } }
+    )
+}
+
+@Composable
+fun StudentGroupDialog(user: User, classEntity: ClassEntity, onDismiss: () -> Unit) {
+    var myGroup by remember { mutableStateOf<GroupEntity?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var viewingUser by remember { mutableStateOf<User?>(null) }
+
+    LaunchedEffect(classEntity.classId) {
+        isLoading = true
+        myGroup = DatabaseHelper.getUserGroup(classEntity.classId, user.userId)
+        isLoading = false
+    }
+
+    if (viewingUser != null) {
+        ViewUserProfileDialog(user = viewingUser!!, onDismiss = { viewingUser = null })
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("My Group Details", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+                    .heightIn(max = 250.dp)
+            ) {
+                if (isLoading) {
+                    Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    }
+                } else {
+                    val group = myGroup
+                    if (group == null) {
+                        Box(Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                            Text(
+                                "No group assigned", 
+                                style = MaterialTheme.typography.bodyMedium, 
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "Group: ${group.group_name}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Members:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(group.members ?: emptyList()) { member ->
+                                val isMe = member.userId == user.userId
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isMe)
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        else
+                                            MaterialTheme.colorScheme.surface
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { viewingUser = member }
+                                            .padding(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        val profileBitmap = rememberProfileBitmap(member.profileImage)
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (profileBitmap != null) {
+                                                Image(
+                                                    bitmap = profileBitmap.asImageBitmap(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Default.Person,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = if (isMe) "${member.fullName ?: member.username} (You)" else member.fullName ?: member.username,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp
+                                            )
+                                            Text(
+                                                text = member.role, 
+                                                style = MaterialTheme.typography.bodySmall, 
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
     )
 }
 

@@ -153,7 +153,7 @@ fun MobSecApp() {
                                 selected = currentScreen == Screen.StudentDashboard,
                                 onClick = { navigateTo(Screen.StudentDashboard) },
                                 icon = { Icon(Icons.Default.History, contentDescription = null) },
-                                modifier = Modifier.padding(NavigationDrawerItemPadding)
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                             )
                             NavigationDrawerItem(
                                 label = { Text("My Classes & Groups") },
@@ -162,17 +162,17 @@ fun MobSecApp() {
                                     navigateTo(Screen.ClassManagement)
                                 },
                                 icon = { Icon(Icons.Default.Group, contentDescription = null) },
-                                modifier = Modifier.padding(NavigationDrawerItemPadding)
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                             )
                         }
 
                         if (user.role.equals("Teacher", ignoreCase = true)) {
                             NavigationDrawerItem(
-                                label = { Text("Teacher Dashboard") },
+                                label = { Text("Pending Queries") },
                                 selected = currentScreen == Screen.TeacherDashboard,
                                 onClick = { navigateTo(Screen.TeacherDashboard) },
-                                icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
-                                modifier = Modifier.padding(NavigationDrawerItemPadding)
+                                icon = { Icon(Icons.Default.HelpOutline, contentDescription = null) },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                             )
                         }
 
@@ -184,8 +184,8 @@ fun MobSecApp() {
                                 label = { Text(if (isAdmin) "Manage Classes & Groups" else "My Classes & Groups") },
                                 selected = currentScreen == Screen.ClassManagement || currentScreen == Screen.GroupManagement || currentScreen == Screen.GroupClassList,
                                 onClick = { navigateTo(Screen.ClassManagement) },
-                                icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                                modifier = Modifier.padding(NavigationDrawerItemPadding)
+                                icon = { Icon(Icons.Default.Group, contentDescription = null) },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                             )
                         }
 
@@ -196,7 +196,7 @@ fun MobSecApp() {
                                 selected = currentScreen == Screen.AdminTeacherManagement,
                                 onClick = { navigateTo(Screen.AdminTeacherManagement) },
                                 icon = { Icon(Icons.Default.SupervisedUserCircle, contentDescription = null) },
-                                modifier = Modifier.padding(NavigationDrawerItemPadding)
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                             )
                         }
 
@@ -219,7 +219,7 @@ fun MobSecApp() {
                                 scope.launch { drawerState.close() }
                             },
                             icon = { Icon(Icons.Default.ExitToApp, contentDescription = null) },
-                            modifier = Modifier.padding(NavigationDrawerItemPadding)
+                            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
@@ -256,8 +256,6 @@ fun MobSecApp() {
         )
     }
 }
-
-private val NavigationDrawerItemPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
 
 @Composable
 fun AppScaffold(
@@ -533,3 +531,6 @@ sealed class Screen {
     object AdminRegister : Screen()
     data class EditUserProfile(val targetUser: User) : Screen()
 }
+
+@Composable
+private fun NavigationDrawerItemDefaults.ItemPadding(): PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 0.dp)

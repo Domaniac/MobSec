@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -71,8 +72,8 @@ fun TeacherDashboardScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToResourceLibrary) {
-                        Icon(Icons.Default.LibraryBooks, contentDescription = "Resource Library")
+                    IconButton(onClick = { refreshQuestions() }, enabled = !isLoading) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
                 }
             )
@@ -92,10 +93,6 @@ fun TeacherDashboardScreen(
                         "No unanswered questions found.",
                         style = MaterialTheme.typography.bodyLarge
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = onNavigateToResourceLibrary) {
-                        Text("Go to Resource Library")
-                    }
                 }
             } else {
                 LazyColumn(
