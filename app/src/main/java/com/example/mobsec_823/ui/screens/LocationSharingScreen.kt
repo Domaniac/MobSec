@@ -127,7 +127,7 @@ fun LocationSharingScreen(userId: Int, onBackClick: () -> Unit) {
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                             .border(1.dp, Color.LightGray),
-                        onClick = { openInMaps(loc.latitude, loc.longitude, loc.username) }
+                        onClick = { openInMaps(loc.latitude, loc.longitude, loc.username ?: "User ${loc.userId}") }
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp),
@@ -135,8 +135,9 @@ fun LocationSharingScreen(userId: Int, onBackClick: () -> Unit) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
+                                val displayName = loc.username ?: "User ${loc.userId}"
                                 Text(
-                                    text = if (loc.userId == userId) "${loc.username} (You)" else loc.username,
+                                    text = if (loc.userId == userId) "$displayName (You)" else displayName,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text("Last seen: ${loc.lastSeen ?: "Unknown"}", fontSize = 11.sp, color = Color.Gray)
