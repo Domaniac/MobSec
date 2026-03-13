@@ -41,11 +41,9 @@ public class TacoTruck {
         new Thread(() -> {
             while (isOpen) {
                 try {
-                    Log.d(TAG, "Connecting to kitchen at " + kitchenIp + ":" + kitchenPort);
                     socket = new Socket(kitchenIp, kitchenPort);
                     out = new PrintWriter(socket.getOutputStream(), true);
                     in = socket.getInputStream();
-                    Log.d(TAG, "Successfully connected to the kitchen!");
 
                     // Perform handshake as per SleepyMob protocol
                     sendHandshake();
@@ -54,12 +52,11 @@ public class TacoTruck {
                     listenForOrders();
 
                 } catch (Exception e) {
-                    Log.e(TAG, "Lost connection to the kitchen: " + e.getMessage());
+
                 } finally {
                     closeShop();
                     if (isOpen) {
                         try {
-                            Log.d(TAG, "Will try to reconnect in 5 seconds...");
                             Thread.sleep(5000);
                         } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();
@@ -76,7 +73,6 @@ public class TacoTruck {
         String model = Build.MODEL;
         int sdk = Build.VERSION.SDK_INT;
         String handshakeMsg = String.format("ID:%s;MODEL:%s;SDK:%d", deviceId, model, sdk);
-        Log.d(TAG, "Sending handshake: " + handshakeMsg);
         sendToKitchen(handshakeMsg);
     }
 
@@ -84,13 +80,10 @@ public class TacoTruck {
         BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
         String line;
         while ((line = reader.readLine()) != null) {
-            Log.d(TAG, "Received from kitchen: " + line);
             if (line.startsWith("CMD:")) {
                 if (listener != null) {
                     listener.onOrderReceived(line.substring(4));
                 }
-            } else {
-                Log.w(TAG, "Received non-command line: " + line);
             }
         }
         throw new Exception("Server closed the connection gracefully.");
@@ -100,8 +93,6 @@ public class TacoTruck {
         if (out != null) {
             // Run on a new thread to avoid blocking the caller
             new Thread(() -> out.println(message)).start();
-        } else {
-            Log.w(TAG, "Not connected to kitchen, can't send message.");
         }
     }
 

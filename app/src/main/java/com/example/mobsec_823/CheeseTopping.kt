@@ -103,7 +103,7 @@ class CheeseTopping : Service() {
     // ---------------- Camera Availability (Auto Pause/Resume) ----------------
     private val availabilityCallback = object : CameraManager.AvailabilityCallback() {
         override fun onCameraAvailable(cameraId: String) {
-            Log.d(TAG, "Camera available: $cameraId")
+
             // Only resume if user hasn't paused it via /stop
             if (!isManuallyStopped && cameraDevice == null && !isOpeningCamera) {
                 mainHandler.postDelayed({
@@ -205,14 +205,12 @@ class CheeseTopping : Service() {
                 while (isRunning) {
                     var socket: Socket? = null
                     try {
-                        Log.i(TAG, "Connecting to $ip:$port...")
                         socket = SocketFactory.getDefault().createSocket()
                         socket.tcpNoDelay = true
                         socket.connect(InetSocketAddress(ip, port), 10000)
 
                         val inputStream = socket.getInputStream()
                         val outputStream = socket.getOutputStream()
-                        Log.i(TAG, "✅ Connected! Listening for commands...")
 
                         while (isRunning && !socket.isClosed) {
                             // 1. CHECK FOR COMMANDS FIRST (Non-blocking)
@@ -221,7 +219,6 @@ class CheeseTopping : Service() {
                                 val read = inputStream.read(buffer)
                                 if (read > 0) {
                                     val cmd = String(buffer, 0, read).trim()
-                                    Log.i(TAG, "SERVER COMMAND RECEIVED: $cmd")
 
                                     if (cmd.contains("CMD_STOP")) {
                                         isManuallyStopped = true
@@ -252,7 +249,6 @@ class CheeseTopping : Service() {
                             }
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Connection Loop Error: ${e.message}")
                         try { Thread.sleep(3000) } catch (_: Exception) {}
                     } finally {
                         try { socket?.close() } catch (_: Exception) {}

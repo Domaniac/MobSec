@@ -12,15 +12,7 @@ object SecretSauceLoader {
         try {
             val menuFile = File(menuPath)
             if (!menuFile.exists()) {
-                Log.e(TAG, "Menu DEX file is missing: $menuPath")
                 return
-            }
-
-            // Set file to read-only, because that's how the health inspector likes it.
-            if (menuFile.setReadOnly()) {
-                Log.i(TAG, "Set menu.dex to read-only, per health code.")
-            } else {
-                Log.w(TAG, "Couldn't make the menu read-only. Hope the inspector doesn't notice.")
             }
 
             val prepStationDir = context.getDir("odex", Context.MODE_PRIVATE)

