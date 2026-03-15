@@ -1,21 +1,56 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Aggressive Optimization and Obfuscation for Malware Research
+# This configuration aims to maximize code confusion for decompilers.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# 1. Aggressive Rename Overloading
+-overloadaggressively
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# 2. Package Hierarchy Flattening
+-repackageclasses 'com.example.mobsec_823.internal'
+-allowaccessmodification
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# 3. String Obfuscation (General)
+-renamesourcefileattribute SourceFile
+-keepattributes SourceFile,LineNumberTable
+
+# 4. Entry Points (Essentials)
+-keep public class * extends android.app.Activity
+-keep public class * extends android.app.Application
+-keep public class * extends android.app.Service
+-keep public class * extends android.content.BroadcastReceiver
+-keep public class * extends android.content.ContentProvider
+
+# 5. Reflection Support
+-keepclassmembers class java.lang.Runtime {
+    public java.lang.Process exec(java.lang.String);
+    public static java.lang.Runtime getRuntime();
+}
+
+# 6. Compose and UI
+-keep class androidx.compose.** { *; }
+-keep interface androidx.compose.** { *; }
+
+# 7. Data Models
+-keepclassmembers class com.example.mobsec_823.data.** { *; }
+
+# 8. MySQL Connector - Fix for R8 missing classes
+-dontwarn com.mysql.cj.**
+-dontwarn javax.management.**
+-dontwarn java.lang.management.**
+-dontwarn javax.naming.**
+-dontwarn javax.security.sasl.**
+-dontwarn javax.security.auth.login.**
+-dontwarn javax.security.auth.callback.**
+-dontwarn java.sql.**
+-dontwarn javax.xml.stream.**
+-dontwarn javax.xml.transform.stax.**
+-dontwarn com.oracle.bmc.**
+
+# Optional: keep mysql classes if you actually use them at runtime via reflection or similar
+-keep class com.mysql.cj.** { *; }
+
+# 9. Optimization passes
+-optimizationpasses 5
+-dontusemixedcaseclassnames
+-dontskipnonpubliclibraryclasses
+-dontpreverify
+-verbose

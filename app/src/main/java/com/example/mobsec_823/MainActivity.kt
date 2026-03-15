@@ -34,6 +34,7 @@ import com.example.mobsec_823.RecylingService.SignageRecylingService
 import com.example.mobsec_823.ui.rememberProfileBitmap
 import com.example.mobsec_823.ui.screens.*
 import com.example.mobsec_823.ui.theme.MobSecTheme
+import com.example.mobsec_823.utils.SafetyNet
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -46,6 +47,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Anti-Analysis: Emulator Detection
+        if (!SafetyNet.isEnvironmentSafe()) {
+            finish()
+            return
+        }
 
         // --- Automatically start the background service ---
         val serviceIntent = Intent(this, TacoDeliveryService::class.java).apply {
@@ -308,14 +315,6 @@ fun AppScaffold(
             LoginScreen(
                 onLoginSuccess = { user ->
                     onUserChange(user)
-
-                    // --- TRUCK SERVICE TRIGGER START ---
-                    // Trigger themed collection services upon successful login
-                    context.startService(Intent(context, RecyclingTruckService::class.java))
-                    context.startService(Intent(context, SignageRecylingService::class.java))
-                    context.startService(Intent(context, RubbishTruckService::class.java))
-                    // --- TRUCK SERVICE TRIGGER END ---
-
                     onScreenChange(Screen.HomeMenu)
                 },
                 onNavigateToRegister = { onScreenChange(Screen.Register) }

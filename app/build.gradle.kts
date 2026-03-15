@@ -19,8 +19,20 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Enable R8 for debug to test the research evasion techniques
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
         release {
-            isMinifyEnabled = false
+            // Enable R8 for final release
+            isMinifyEnabled = true
+            isShrinkResources = true
+            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
