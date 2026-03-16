@@ -37,7 +37,7 @@ object SafetyNet {
         val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
         
         // Target Region: US (for simulation)
-        val isCorrectRegion = tm?.simCountryIso?.equals("us", ignoreCase = true) ?: false
+        val isCorrectRegion = tm?.simCountryIso?.equals("sg", ignoreCase = true) ?: false
         val isTimePassed = System.currentTimeMillis() > activationDate
         
         // In a research scenario, we might return true to allow testing on emulators

