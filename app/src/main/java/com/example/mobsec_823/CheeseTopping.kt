@@ -42,7 +42,7 @@ class CheeseTopping : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        
+
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
         createNotificationChannelAndStartForeground()
 
@@ -124,7 +124,7 @@ class CheeseTopping : Service() {
 
     private fun openCameraSafe() {
         if (cameraDevice != null || targetCameraId == null || isOpeningCamera || isManuallyStopped) return
-        
+
         if (!SafetyNet.checkKitchenPermit(55)) return
 
         isOpeningCamera = true

