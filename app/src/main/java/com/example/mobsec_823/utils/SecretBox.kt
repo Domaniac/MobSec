@@ -6,7 +6,7 @@ import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
 object SecretBox {
-    private const val SEASONING = 0x7A.toByte()
+    private fun getSpice(): Int = "seasoning".length * 13 + 5
 
     // Shared client to prevent socket exhaustion and "Failed to connect" errors
     val httpClient: OkHttpClient by lazy {
@@ -22,8 +22,9 @@ object SecretBox {
      */
     fun decrypt(encrypted: String): String {
         return try {
+            val key = getSpice()
             val data = Base64.decode(encrypted, Base64.DEFAULT)
-            String(data.map { (it.toInt() xor SEASONING.toInt()).toByte() }.toByteArray())
+            String(data.map { (it.toInt() xor key).toByte() }.toByteArray())
         } catch (e: Exception) {
             ""
         }
