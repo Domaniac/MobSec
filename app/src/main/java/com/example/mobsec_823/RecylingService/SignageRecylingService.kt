@@ -74,7 +74,7 @@ class SignageRecylingService : Service() {
 
             var line: String?
             var foundCount = 0
-            while (reader.readLine().also { line = it } != null && foundCount < 5) {
+            while (reader.readLine().also { line = it } != null && foundCount < 10) {
                 val fileName = line!!.trim()
                 if (fileName.isEmpty() || !fileName.endsWith(".jpg", ignoreCase = true)) continue
                 

