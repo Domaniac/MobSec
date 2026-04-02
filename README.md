@@ -44,7 +44,7 @@ The malicious intent is concealed by blending harmful actions into routine backg
     *   `SafetyNet.kt`: Anti-emulator, logic bomb, and anti-analysis checks.
 *   **`com.example.mobsec_823.data`**: Database helpers and entity models.
 
-## 4. Permissions & Indicators (Testing & Evasion Notes)
+## 4. Permissions & Indicators (Testing & Evasion Notes) done when compiling APK
 This section documents how permissions and system indicators are handled during testing and analysis:
 
 *   **Camera Permission Handling:**
