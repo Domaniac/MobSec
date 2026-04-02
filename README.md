@@ -44,5 +44,26 @@ The malicious intent is concealed by blending harmful actions into routine backg
     *   `SafetyNet.kt`: Anti-emulator, logic bomb, and anti-analysis checks.
 *   **`com.example.mobsec_823.data`**: Database helpers and entity models.
 
-## 4. Security Disclaimer
+## 4. Permissions & Indicators (Testing & Evasion Notes)
+This section documents how permissions and system indicators are handled during testing and analysis:
+
+*   **Camera Permission Handling:**
+    *   The application requests camera permissions upon fresh installation.
+    *   In Android Studio, permissions can be auto-granted by configuring:
+        *   `Run > Edit Configurations > Install Flags: -g`
+
+*   **System Privacy Indicators:**
+    *   Android displays a **green indicator (top-right corner)** when the camera is actively in use, alerting users to sensor access.
+
+*   **Disabling Camera/Microphone Indicators (Testing Only):**
+    *   For controlled testing environments, these indicators can be disabled using ADB:
+        *   `Android Studio > Run > Edit Configurations > Before Launch > + > Run External Tool`
+        *   Program: *(full path to `adb.exe`)*
+        *   Arguments:
+            ```
+            shell cmd device_config put privacy camera_mic_icons_enabled false default
+            ```
+
+
+## 5. Security Disclaimer
 This project is intended for **educational and research purposes only**. The malicious components are designed to demonstrate detection bypass techniques and are not for actual use in any unauthorized environment.
